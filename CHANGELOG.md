@@ -8,4 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0]
 
-- First release.
+- Parse WWW-Authenticate and Proxy-Authenticate headers into a list of challenges, with
+  multi-challenge comma disambiguation, token68 and quoted auth-params (RFC 7235).
+- Parse Authorization and Proxy-Authorization credentials into a scheme with token68 or
+  auth-params.
+- Build challenge and credentials strings back, quoting values only when required.
+- Typed, zero dependencies, `py.typed`.
