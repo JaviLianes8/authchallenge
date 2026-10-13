@@ -9,10 +9,10 @@ Progress:
 - [x] Safe builder: no CR, LF or other controls, sender quoting rules, realm always quoted, duplicate names refused
 - [x] Helpers: Basic encode and decode, Bearer challenge, Authentication-Info, ext-value, challenge selection
 - [x] Command line
-- [ ] Contracts: pinned sources, greenbytes corpus, README examples, installed wheel
+- [x] Contracts: pinned sources, greenbytes corpus, README examples, installed wheel
 - [x] Docs and packaging: README, CHANGELOG, metadata, sdist contents
-- [ ] Gates: ruff format, ruff check, mypy --strict, pytest
-- [ ] Mutation run: removing guarded logic makes the suite fail
+- [x] Gates: ruff format, ruff check, mypy --strict, pytest
+- [x] Mutation run: removing guarded logic makes the suite fail
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
@@ -115,3 +115,14 @@ Progress:
   client. The Digest examples are checked for syntax only.
 - PRECIS preparation of Basic user-ids and passwords (RFC 7613): callers normalise.
 - Deciding which scheme is most secure: `select_challenge` follows the caller's order.
+
+## Verification
+
+- Gates on a clean clone with Python 3.14: ruff format, ruff check, mypy --strict and
+  pytest green, with the reference files fetched and checked against the manifest.
+- Installed wheel: built, installed in a fresh venv and driven from an empty folder,
+  including the console script and `python -m authchallenge`.
+- Mutation run: 30 mutants, each removing one guard (injection check, octet check,
+  obs-fold handling, duplicate rule, quoting lists, scheme requirements, Basic and
+  ext-value checks, CLI exit code); the suite fails for every one, and is green before
+  and after.
