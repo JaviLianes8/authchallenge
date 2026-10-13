@@ -70,7 +70,7 @@ def test_cli_plain_values_are_kept_when_a_later_line_has_a_colon(
 
 
 def test_a_bare_newline_ends_a_field_line_in_tolerant_mode() -> None:
-    challenges = parse_challenges('Basic realm="a"\nBearer realm="b"\r\nrealm="c"')
+    challenges = parse_challenges('Basic realm="a"\nBearer realm="b"\r\nx="c"')
     assert [(c.scheme, c.params) for c in challenges] == [
         ("Basic", {"realm": "a"}),
         ("Bearer", {"realm": "b"}),
