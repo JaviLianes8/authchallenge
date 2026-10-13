@@ -24,9 +24,14 @@ _FIELD_LINE = re.compile(r"([!#$%&'*+.^_`|~0-9A-Za-z-]+):[ \t]*(.*)")
 
 
 def _fields(text: str, default: str) -> list[tuple[str, str]]:
-    """Return (field name, value) pairs from a header dump, or one per plain line."""
+    """Return (field name, value) pairs from a header dump, or one per plain line.
+
+    The first non-empty line decides: a status line or a `Name: value` line makes the
+    whole input a header dump, of which only the authentication fields are read.
+    """
     lines = [line.rstrip("\r") for line in text.splitlines()]
-    dump = any(line.startswith("HTTP/") or _FIELD_LINE.fullmatch(line) for line in lines)
+    first = next((line for line in lines if line.strip()), "")
+    dump = first.startswith("HTTP/") or _FIELD_LINE.fullmatch(first) is not None
     if not dump:
         return [(default, line.strip()) for line in lines if line.strip()]
     pairs: list[tuple[str, str]] = []
@@ -70,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--authorization", action="store_true", help="values are credentials")
     group.add_argument("--info", action="store_true", help="values are Authentication-Info")
-    parser.add_argument("--strict", action="store_true", help="report every rule broken")
+    parser.add_argument("--strict", action="store_true", help="exit 1 on the first broken rule")
     args = parser.parse_args(argv)
     default = "WWW-Authenticate"
     if args.authorization or args.info:

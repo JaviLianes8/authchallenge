@@ -16,7 +16,7 @@ from authchallenge import AuthError, parse_auth_info, parse_authorization, parse
         ('Basic realm="a\x7f"', "not allowed"),
         ('Basic realm="Ā"', "not allowed"),
         ('Basic realm="basic', "unterminated quoted-string at offset 12"),
-        ('Basic realm="x" extra', "unexpected text after the value of 'realm' at offset 15"),
+        ('Basic realm="x" extra', "unexpected text after the value of 'realm' at offset 16"),
         ('Digest qop="auth"x', "unexpected text after the value of 'qop'"),
         ("Basic realm=\\f\\o\\o", "expected a token68 or an auth-param at offset 6"),
         ('Basic, realm="foo"', "auth-param 'realm' outside a challenge at offset 7"),

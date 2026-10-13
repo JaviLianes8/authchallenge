@@ -39,6 +39,7 @@ digest = {"realm": "r", "qop": "auth", "nonce": "n", "algorithm": "MD5"}
 header = ac.build_challenge("Digest", digest)
 assert header == 'Digest realm="r", qop="auth", nonce="n", algorithm=MD5'
 assert ac.parse_challenges(header, strict=True)[0].params == digest
+# RFC 7617 sections 2 and 2.1, https://www.rfc-editor.org/rfc/rfc7617
 assert ac.encode_basic("Aladdin", "open sesame") == "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="
 assert ac.decode_basic(ac.parse_authorization("Basic dGVzdDoxMjPCow==")) == ("test", "123£")
 assert ac.decode_ext_value(ac.encode_ext_value("Jäsøn")) == "Jäsøn"

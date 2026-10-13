@@ -48,7 +48,7 @@ for header in ('Basic, realm="a"', "Basic realm=a", 'Basic realm="a" extra', "Be
 # [Challenge(scheme='Basic', token68=None, params={'realm': 'a'})]
 # auth-param 'realm' outside a challenge at offset 7
 # the realm parameter must be a quoted-string, in the challenge at offset 0
-# unexpected text after the value of 'realm' at offset 15
+# unexpected text after the value of 'realm' at offset 16
 # a Bearer challenge needs at least one auth-param, in the challenge at offset 0
 ```
 
@@ -72,7 +72,9 @@ except AuthError as error:
 # the value of 'realm' may hold only tab, space and visible ASCII; send other text as an RFC 8187 ext-value (see encode_ext_value)
 ```
 
-Credentials, with helpers for Basic and for the RFC 8187 `username*` of Digest:
+Credentials, with helpers for Basic and for the RFC 8187 `username*` of Digest. The
+vectors come from RFC 7617 sections 2 and 2.1 (https://www.rfc-editor.org/rfc/rfc7617)
+and RFC 7616 section 3.9.2 (https://www.rfc-editor.org/rfc/rfc7616):
 
 ```python
 from authchallenge import decode_basic, decode_ext_value, encode_basic, parse_authorization
@@ -113,8 +115,8 @@ authchallenge --authorization 'Bearer mF_9.B5f-4.1JqM'
 ```
 
 Values come as arguments or one per stdin line; a header dump on stdin is read for the
-authentication fields only. The output is JSON. `--strict` reports every broken rule on
-stderr and exits 1.
+authentication fields only (the first non-empty line decides which). The output is JSON.
+`--strict` reports the first broken rule of each value on stderr and exits 1.
 
 ## API
 

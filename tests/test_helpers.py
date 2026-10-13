@@ -69,6 +69,7 @@ def test_basic_decoding_refuses_other_input(value: str | Credentials, reason: st
 
 
 def test_ext_value_round_trip() -> None:
+    # RFC 7616 section 3.9.2, https://www.rfc-editor.org/rfc/rfc7616
     encoded = encode_ext_value("Jäsøn Doe")
     assert encoded == "UTF-8''J%C3%A4s%C3%B8n%20Doe"
     assert decode_ext_value(encoded) == "Jäsøn Doe"

@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.2.0]
+## [0.2.0] - unreleased
 
 ### Security
 
@@ -33,6 +33,10 @@ All notable changes to this project are documented here. The format follows
 - A token68 challenge never collects params that follow it.
 - Builders quote `realm` always, every Basic and Bearer param, and the Digest params RFC
   7616 lists; Digest `stale`, `algorithm`, `qop` (credentials) and `nc` are written bare.
+- Tolerant parsing reads a bare line break (not obsolete folding) as the end of a field
+  line, and drops a token value cut short by a stray character instead of truncating it.
+- `decode_ext_value` refuses text that decodes to control characters; `encode_basic` and
+  `decode_basic` accept only UTF-8 and ISO-8859-1.
 - Builders refuse names that differ only in case and whatever strict parsing refuses,
   including a Basic challenge without realm and incomplete Digest params.
 

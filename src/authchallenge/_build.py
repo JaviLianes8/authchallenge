@@ -26,11 +26,12 @@ def _must_quote(scheme: str, kind: str, name: str, value: str) -> bool:
 def _render_params(scheme: str, kind: str, params: Mapping[str, str]) -> tuple[str, list[Param]]:
     rendered: list[str] = []
     read: list[Param] = []
+    seen: set[str] = set()
     for key, value in params.items():
         if not isinstance(key, str) or not is_token(key):
             raise AuthError(f"invalid auth-param name: {key!r}")
         name = key.lower()
-        if any(seen.name == name for seen in read):
+        if name in seen:
             raise AuthError(f"duplicate auth-param name: {key!r}")
         if not isinstance(value, str) or not is_field_text(value):
             raise AuthError(
@@ -40,6 +41,7 @@ def _render_params(scheme: str, kind: str, params: Mapping[str, str]) -> tuple[s
         quoted = _must_quote(scheme, kind, name, value)
         rendered.append(f"{key}={quote(value) if quoted else value}")
         read.append(Param(name, value, quoted, 0))
+        seen.add(name)
     return ", ".join(rendered), read
 
 

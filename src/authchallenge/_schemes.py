@@ -114,7 +114,7 @@ def check(scheme: str, kind: str, token68: str | None, params: Sequence[Param]) 
     """
     found = _values(params)
     realm = found.get("realm")
-    if realm is not None and not realm.quoted:
+    if kind == "challenge" and realm is not None and not realm.quoted:
         raise AuthError("the realm parameter must be a quoted-string")
     rules = {"basic": _basic, "bearer": _bearer, "digest": _digest}.get(scheme.lower())
     if rules is not None and (kind != "info" or rules is _digest):

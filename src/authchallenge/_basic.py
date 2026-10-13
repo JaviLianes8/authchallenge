@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import codecs
 
 from ._grammar import is_token68
 from ._model import AuthError, Credentials
@@ -12,6 +13,17 @@ from ._model import AuthError, Credentials
 def _has_control(text: str) -> bool:
     # RFC 7617 refers to CTL of RFC 5234: the ASCII controls and DEL (see erratum 9174).
     return any(ord(char) < 0x20 or ord(char) == 0x7F for char in text)
+
+
+def _codec(charset: str) -> str:
+    # RFC 7617 needs an encoding that maps US-ASCII to single octets: UTF-8 or ISO-8859-1.
+    try:
+        name = codecs.lookup(charset).name
+    except LookupError:
+        name = ""
+    if name not in ("utf-8", "iso8859-1"):
+        raise AuthError(f"unsupported Basic charset {charset!r}: use 'utf-8' or 'latin-1'")
+    return name
 
 
 def split_user_pass(token68: str, charset: str) -> tuple[str, str]:
@@ -23,7 +35,7 @@ def split_user_pass(token68: str, charset: str) -> tuple[str, str]:
     except (binascii.Error, ValueError) as error:
         raise AuthError("Basic credentials are not valid base64") from error
     try:
-        text = raw.decode(charset)
+        text = raw.decode(_codec(charset))
     except UnicodeDecodeError as error:
         raise AuthError(f"Basic credentials are not valid {charset}") from error
     user_id, colon, password = text.partition(":")
@@ -39,14 +51,15 @@ def encode_basic(user_id: str, password: str, *, charset: str = "utf-8") -> str:
 
     The user-id may not contain a colon, and neither part may contain control characters.
     UTF-8 is what a server asks for with `charset="UTF-8"`; pass "latin-1" for servers
-    that expect ISO-8859-1. The text is encoded as given, without Unicode normalisation.
+    that expect ISO-8859-1; other charsets raise AuthError. The text is encoded as
+    given, without Unicode normalisation.
     """
     if ":" in user_id:
         raise AuthError("a Basic user-id cannot contain ':'")
     if _has_control(user_id) or _has_control(password):
         raise AuthError("Basic user-id and password must not contain control characters")
     try:
-        raw = f"{user_id}:{password}".encode(charset)
+        raw = f"{user_id}:{password}".encode(_codec(charset))
     except UnicodeEncodeError as error:
         raise AuthError(f"the credentials cannot be encoded as {charset}") from error
     return "Basic " + base64.b64encode(raw).decode("ascii")

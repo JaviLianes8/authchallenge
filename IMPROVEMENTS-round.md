@@ -13,7 +13,7 @@ Progress:
 - [x] Docs and packaging: README, CHANGELOG, metadata, sdist contents
 - [x] Gates: ruff format, ruff check, mypy --strict, pytest
 - [x] Mutation run: removing guarded logic makes the suite fail
-- [ ] Independent review findings fixed with regression tests
+- [x] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
 ## Starting point
@@ -65,7 +65,7 @@ Progress:
   3.1 (error codes) and 2.1 (b64token; reported erratum 5335 says it is token68).
 - RFC 8187, https://www.rfc-editor.org/rfc/rfc8187.txt: ext-value for `username*`.
 - greenbytes httpauth test cases, http://test.greenbytes.de/tech/tc/httpauth/
-  (Last-Modified 27 May 2021): 32 WWW-Authenticate cases with the expected parse after
+  (Last-Modified 27 May 2021): 32 WWW-Authenticate cases, 31 of them with a field value, with the expected parse after
   post-processing and the ones marked as parse errors.
 - None of these files is committed. `tests/upstream/MANIFEST.json` records URL, revision,
   size, sha256 and licence; `scripts/fetch_upstream.py` fetches and checks them into the
@@ -126,3 +126,27 @@ Progress:
   obs-fold handling, duplicate rule, quoting lists, scheme requirements, Basic and
   ext-value checks, CLI exit code); the suite fails for every one, and is green before
   and after.
+
+## Independent review
+
+Fixed, each with a test in `tests/test_review_fixes.py`:
+
+- The obs-fold pattern was quadratic on long runs of spaces and tabs; it now matches the
+  line break first.
+- The duplicate-name checks of the parsers and builders scanned every earlier param; they
+  use a set.
+- `encode_basic` accepted charsets that are not ASCII compatible (UTF-16 output failed
+  strict parsing) and leaked `LookupError`; only UTF-8 and ISO-8859-1 are accepted.
+- The command line switched to header-dump mode on any `Name: value` line and dropped
+  plain values; the first non-empty line now decides.
+- Tolerant mode lost a challenge after a bare line break and truncated a token value at a
+  stray character; the line break ends a field line and the cut value is dropped.
+- Error offsets pointed at the whitespace before the junk, and errors on several field
+  lines did not name the line.
+- `decode_ext_value` returned control characters; it refuses them.
+- The realm quoting rule applied to credentials and Authentication-Info; it is a rule for
+  challenges (Digest credentials keep their own list).
+- Docs: `--strict` reports the first broken rule, the greenbytes count, RFC URLs next to
+  the vectors, the CHANGELOG heading; a seeded property test pins that built output
+  passes strict parsing and parses back to the same values; the greenbytes test checks
+  token68.

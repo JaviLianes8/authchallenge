@@ -24,7 +24,8 @@ def decode_ext_value(value: str) -> str:
     """Decode an RFC 8187 ext-value, raising AuthError when malformed or not UTF-8.
 
     RFC 8187 makes UTF-8 the only charset producers may use; ISO-8859-1 is also read,
-    since RFC 5987 (which it replaces) allowed it.
+    since RFC 5987 (which it replaces) allowed it. Control characters (C0, DEL, C1) in
+    the decoded text are refused, so a decoded name cannot carry a line break.
     """
     match = _EXT_VALUE.fullmatch(value)
     if match is None:
@@ -33,6 +34,9 @@ def decode_ext_value(value: str) -> str:
     if charset not in ("utf-8", "iso-8859-1"):
         raise AuthError(f"unsupported ext-value charset: {match.group('charset')!r}")
     try:
-        return unquote_to_bytes(match.group("value")).decode(charset)
+        text = unquote_to_bytes(match.group("value")).decode(charset)
     except UnicodeDecodeError as error:
         raise AuthError(f"ext-value is not valid {charset}") from error
+    if any(ord(char) < 0x20 or 0x7F <= ord(char) < 0xA0 for char in text):
+        raise AuthError("ext-value decodes to control characters")
+    return text

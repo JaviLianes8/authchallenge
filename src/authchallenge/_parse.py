@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from typing import TypeVar
 
 from ._model import AuthError, Challenge, Credentials
 from ._scan import Item, Param, classify, fail, prepare, split
 from ._schemes import check
+
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -16,60 +19,84 @@ class _Draft:
     offset: int
     token68: str | None
     open: bool
-    params: list[Param] = field(default_factory=list)
+    params: dict[str, Param] = field(default_factory=dict)
+
+    def values(self) -> dict[str, str]:
+        return {name: param.value for name, param in self.params.items()}
 
 
-def _items(value: str, strict: bool) -> list[Item]:
+def _items(value: str, strict: bool) -> list[list[Item]]:
+    """Items of each line. Strict mode refuses line breaks; tolerant mode reads a bare one
+    (not obs-fold) as the end of a field line, so the next line keeps its challenges."""
     text = prepare(value, strict)
-    parts, open_quote = split(text)
-    if strict and open_quote is not None:
-        raise fail("unterminated quoted-string", open_quote)
-    items = [classify(offset, raw, strict) for offset, raw in parts]
-    if strict:
-        for item in items:
-            if item.error:
-                raise fail(item.error, item.error_at)
-    return items
+    lines = [text] if strict else text.replace("\r\n", "\n").split("\n")
+    result: list[list[Item]] = []
+    for line in lines:
+        parts, open_quote = split(line)
+        if strict and open_quote is not None:
+            raise fail("unterminated quoted-string", open_quote)
+        items = [classify(offset, raw, strict) for offset, raw in parts]
+        if strict:
+            for item in items:
+                if item.error:
+                    raise fail(item.error, item.error_at)
+        result.append(items)
+    return result
 
 
-def _add(params: list[Param], param: Param, strict: bool) -> None:
-    if any(seen.name == param.name for seen in params):
+def _add(params: dict[str, Param], param: Param, strict: bool) -> None:
+    if param.name in params:
         if strict:
             raise fail(f"duplicate auth-param {param.name!r}", param.offset)
         return  # the first one wins, as most user agents do
-    params.append(param)
+    params[param.name] = param
+
+
+def _step(drafts: list[_Draft], start: int, item: Item, strict: bool) -> None:
+    if item.kind == "challenge":
+        drafts.append(_Draft(item.scheme, item.offset, item.token68, item.open))
+        if item.param is not None:
+            _add(drafts[-1].params, item.param, strict)
+    elif item.kind == "param" and item.param is not None:
+        current = drafts[-1] if len(drafts) > start else None
+        if current is None or current.token68 is not None or not current.open:
+            if strict:
+                raise fail(f"auth-param {item.param.name!r} outside a challenge", item.offset)
+            if current is None or current.token68 is not None:
+                return
+        current.open = True
+        _add(current.params, item.param, strict)
 
 
 def _drafts(value: str, strict: bool) -> list[_Draft]:
     drafts: list[_Draft] = []
-    for item in _items(value, strict):
-        if item.kind == "challenge":
-            drafts.append(_Draft(item.scheme, item.offset, item.token68, item.open))
-            if item.param is not None:
-                _add(drafts[-1].params, item.param, strict)
-        elif item.kind == "param" and item.param is not None:
-            current = drafts[-1] if drafts else None
-            if current is None or current.token68 is not None or not current.open:
-                if strict:
-                    raise fail(f"auth-param {item.param.name!r} outside a challenge", item.offset)
-                if current is None or current.token68 is not None:
-                    continue
-            current.open = True
-            _add(current.params, item.param, strict)
+    for line in _items(value, strict):
+        start = len(drafts)  # a challenge never continues on the next line
+        for item in line:
+            _step(drafts, start, item, strict)
     return drafts
 
 
 def _checked(draft: _Draft, kind: str, strict: bool) -> _Draft:
     if strict:
         try:
-            check(draft.scheme, kind, draft.token68, draft.params)
+            check(draft.scheme, kind, draft.token68, list(draft.params.values()))
         except AuthError as error:
             raise AuthError(f"{error}, in the {kind} at offset {draft.offset}") from None
     return draft
 
 
-def _lines(value: str | Iterable[str]) -> list[str]:
-    return [value] if isinstance(value, str) else list(value)
+def _each_line(value: str | Iterable[str], read: Callable[[str], _T]) -> list[_T]:
+    lines = [value] if isinstance(value, str) else list(value)
+    results: list[_T] = []
+    for number, line in enumerate(lines, 1):
+        try:
+            results.append(read(line))
+        except AuthError as error:
+            if len(lines) == 1:
+                raise
+            raise AuthError(f"{error} (field line {number})") from None
+    return results
 
 
 def parse_challenges(value: str | Iterable[str], *, strict: bool = False) -> list[Challenge]:
@@ -80,12 +107,12 @@ def parse_challenges(value: str | Iterable[str], *, strict: bool = False) -> lis
     params with the same name wins. With `strict=True` anything RFC 9110, RFC 7617,
     RFC 7616 or RFC 6750 forbids raises `AuthError` with the reason and offset.
     """
-    challenges: list[Challenge] = []
-    for line in _lines(value):
-        for draft in _drafts(line, strict):
-            _checked(draft, "challenge", strict)
-            params = {param.name: param.value for param in draft.params}
-            challenges.append(Challenge(draft.scheme, draft.token68, params))
+
+    def read(line: str) -> list[Challenge]:
+        drafts = [_checked(d, "challenge", strict) for d in _drafts(line, strict)]
+        return [Challenge(d.scheme, d.token68, d.values()) for d in drafts]
+
+    challenges = [c for found in _each_line(value, read) for c in found]
     if strict and not challenges:
         raise AuthError("the field holds no challenge")
     return challenges
@@ -109,8 +136,7 @@ def parse_authorization(value: str, *, strict: bool = False) -> Credentials:
     if not drafts:
         return Credentials("")
     draft = _checked(drafts[0], "credentials", strict)
-    params = {param.name: param.value for param in draft.params}
-    return Credentials(draft.scheme, draft.token68, params)
+    return Credentials(draft.scheme, draft.token68, draft.values())
 
 
 def parse_auth_info(
@@ -122,16 +148,20 @@ def parse_auth_info(
     anything but auth-params and, given the `scheme` of the request's credentials,
     applies its rules (Digest: quoting, `nc`, and rspauth, cnonce and nc with qop).
     """
-    params: list[Param] = []
-    for line in _lines(value):
-        for item in _items(line, strict):
-            if item.kind == "param" and item.param is not None:
-                _add(params, item.param, strict)
-            elif item.kind != "empty" and strict:
-                raise fail("expected an auth-param", item.offset)
+    params: dict[str, Param] = {}
+
+    def read(line: str) -> None:
+        for items in _items(line, strict):
+            for item in items:
+                if item.kind == "param" and item.param is not None:
+                    _add(params, item.param, strict)
+                elif item.kind != "empty" and strict:
+                    raise fail("expected an auth-param", item.offset)
+
+    _each_line(value, read)
     if strict and scheme is not None:
         try:
-            check(scheme, "info", None, params)
+            check(scheme, "info", None, list(params.values()))
         except AuthError as error:
             raise AuthError(f"{error}, in the {scheme} Authentication-Info") from None
-    return {param.name: param.value for param in params}
+    return {name: param.value for name, param in params.items()}

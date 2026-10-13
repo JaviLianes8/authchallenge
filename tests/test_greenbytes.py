@@ -44,6 +44,7 @@ def test_tolerant_parsing_matches_the_post_processed_tables(cases: list[Case]) -
         for challenge, (scheme, params) in zip(got, case.expected, strict=True):
             assert challenge.scheme.lower() == scheme, case.name
             assert challenge.params == _first_of_each(params), case.name
+            assert challenge.token68 is None, case.name
         checked += 1
     assert checked == 28
 

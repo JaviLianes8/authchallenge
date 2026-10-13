@@ -10,8 +10,9 @@ from ._model import AuthError
 
 _PARAM = re.compile(rf"({TOKEN_RE})[ \t]*=[ \t]*({QUOTED_RE}|{TOKEN_RE})", re.DOTALL)
 _SCHEME = re.compile(TOKEN_RE)
-# obs-fold of RFC 9112 section 5.2: a line break followed by whitespace.
-_OBS_FOLD = re.compile(r"[ \t]*\r?\n[ \t]+")
+# obs-fold of RFC 9112 section 5.2: a line break followed by whitespace. The OWS before
+# the break stays in place; matching it too would make long runs of spaces quadratic.
+_OBS_FOLD = re.compile(r"\r?\n[ \t]+")
 
 
 @dataclass(frozen=True)
@@ -86,10 +87,14 @@ def _read_param(item: Item, text: str, offset: int) -> bool:
     match = _PARAM.match(text)
     if match is None:
         return False
-    item.param = _param(match, offset)
-    if match.end() != len(text):
-        item.error = f"unexpected text after the value of {item.param.name!r}"
-        item.error_at = offset + match.end()
+    param = _param(match, offset)
+    item.param = param
+    rest = text[match.end() :]
+    if rest:
+        item.error = f"unexpected text after the value of {param.name!r}"
+        item.error_at = offset + len(text) - len(rest.lstrip(" \t"))
+        if not param.quoted and rest[0] not in " \t":
+            item.param = None  # a token cut short by a stray character is not the value
     return True
 
 
