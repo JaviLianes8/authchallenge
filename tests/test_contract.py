@@ -1,4 +1,9 @@
+from __future__ import annotations
+
+import dataclasses
 import importlib.resources
+
+import pytest
 
 import authchallenge
 
@@ -8,10 +13,18 @@ PUBLIC_API: list[str] = [
     "AuthError",
     "Challenge",
     "Credentials",
+    "build_auth_info",
     "build_authorization",
+    "build_bearer_challenge",
     "build_challenge",
+    "decode_basic",
+    "decode_ext_value",
+    "encode_basic",
+    "encode_ext_value",
+    "parse_auth_info",
     "parse_authorization",
     "parse_challenges",
+    "select_challenge",
 ]
 
 
@@ -32,3 +45,13 @@ def test_version_is_a_three_part_string() -> None:
 
 def test_the_package_ships_type_information() -> None:
     assert importlib.resources.files("authchallenge").joinpath("py.typed").is_file()
+
+
+def test_auth_error_is_a_value_error() -> None:
+    assert issubclass(authchallenge.AuthError, ValueError)
+
+
+def test_results_are_frozen() -> None:
+    challenge = authchallenge.Challenge("Basic")
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        challenge.scheme = "Bearer"  # type: ignore[misc]

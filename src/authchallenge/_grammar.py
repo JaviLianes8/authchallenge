@@ -1,64 +1,63 @@
-"""Low-level RFC 7235 / RFC 7230 grammar: tchar, token68, quoting, list splitting."""
+"""Character classes and quoting of RFC 9110: token, token68, quoted-string, field text."""
 
 from __future__ import annotations
 
 import re
 
-# tchar, the character set of an RFC 7230 token (auth-scheme and auth-param names).
-TCHAR = r"!#$%&'*+\-.^_`|~0-9A-Za-z"
-_TOKEN = re.compile(f"[{TCHAR}]+")
-# token68 = 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"=".
-_TOKEN68 = re.compile(r"[A-Za-z0-9\-._~+/]+=*")
+# tchar of RFC 9110 section 5.6.2: auth-scheme and auth-param names are tokens.
+TCHAR = "!#$%&'*+-.^_`|~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+# token68 of RFC 9110 section 11.2, without its trailing "=" padding.
+TOKEN68_CHARS = "-._~+/0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+_TCHAR_CLASS = "[" + re.escape(TCHAR) + "]"
+TOKEN_RE = _TCHAR_CLASS + "+"
+TOKEN68_RE = "[" + re.escape(TOKEN68_CHARS) + "]+=*"
+QUOTED_RE = r'"(?:[^"\\]|\\.)*"'
+_TOKEN = re.compile(TOKEN_RE)
+_TOKEN68 = re.compile(TOKEN68_RE)
+_QUOTED_PAIR = re.compile(r"\\(.)", re.DOTALL)
 
 
 def is_token(value: str) -> bool:
-    """Whether the value is a valid RFC 7230 token."""
-    return bool(value) and _TOKEN.fullmatch(value) is not None
+    """Whether the value is a non-empty RFC 9110 token."""
+    return _TOKEN.fullmatch(value) is not None
 
 
 def is_token68(value: str) -> bool:
-    """Whether the value is a valid RFC 7235 token68 (base64-style with trailing padding)."""
-    return bool(value) and _TOKEN68.fullmatch(value) is not None
+    """Whether the value is an RFC 9110 token68 (letters, digits, -._~+/ then padding)."""
+    return _TOKEN68.fullmatch(value) is not None
+
+
+def is_field_text(value: str) -> bool:
+    """Whether a sender may write the value: HTAB, SP and visible US-ASCII only.
+
+    RFC 9110 section 5.5 asks new fields to stay within VCHAR, SP and HTAB. Anything else,
+    CR and LF above all, would let a value break out of the header line.
+    """
+    return all(char == "\t" or " " <= char <= "~" for char in value)
+
+
+def bad_octet(value: str) -> int | None:
+    """Offset of the first character a field value cannot hold, or None.
+
+    Field values are octets: HTAB, SP, VCHAR and obs-text (0x80 to 0xFF). Controls, DEL
+    and code points above 0xFF are refused.
+    """
+    for index, char in enumerate(value):
+        code = ord(char)
+        if (code < 0x20 and char != "\t") or code == 0x7F or code > 0xFF:
+            return index
+    return None
 
 
 def quote(value: str) -> str:
-    """Wrap the value in a quoted-string, escaping backslashes and double quotes."""
+    """Wrap the value in a quoted-string, escaping only backslash and double quote."""
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
 
-def quote_if_needed(value: str) -> str:
-    """Emit the value bare when it is a token, otherwise as a quoted-string."""
-    return value if is_token(value) else quote(value)
-
-
 def unquote(value: str) -> str:
-    """Strip the surrounding quotes of a quoted-string and unescape its contents."""
+    """Strip the quotes of a quoted-string and resolve its quoted-pairs."""
     if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
-        return re.sub(r"\\(.)", r"\1", value[1:-1])
+        return _QUOTED_PAIR.sub(r"\1", value[1:-1])
     return value
-
-
-def split_list(header: str) -> list[str]:
-    """Split a header on top-level commas, leaving commas inside quoted strings intact."""
-    parts: list[str] = []
-    buf: list[str] = []
-    in_quote = False
-    escaped = False
-    for ch in header:
-        if escaped:
-            buf.append(ch)
-            escaped = False
-        elif in_quote and ch == "\\":
-            buf.append(ch)
-            escaped = True
-        elif ch == '"':
-            in_quote = not in_quote
-            buf.append(ch)
-        elif ch == "," and not in_quote:
-            parts.append("".join(buf))
-            buf = []
-        else:
-            buf.append(ch)
-    parts.append("".join(buf))
-    return parts
