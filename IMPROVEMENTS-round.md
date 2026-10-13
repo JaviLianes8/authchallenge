@@ -118,14 +118,16 @@ Progress:
 
 ## Verification
 
-- Gates on a clean clone with Python 3.14: ruff format, ruff check, mypy --strict and
-  pytest green, with the reference files fetched and checked against the manifest.
+Final run on a clean clone of the branch head (Python 3.14, Windows), with the reference
+files fetched and checked against the manifest:
+
+- Gates: ruff format, ruff check, mypy --strict and pytest exit 0.
 - Installed wheel: built, installed in a fresh venv and driven from an empty folder,
   including the console script and `python -m authchallenge`.
-- Mutation run: 30 mutants, each removing one guard (injection check, octet check,
-  obs-fold handling, duplicate rule, quoting lists, scheme requirements, Basic and
-  ext-value checks, CLI exit code); the suite fails for every one, and is green before
-  and after.
+- Mutation run: 35 mutants, each removing one guard (injection check, octet check,
+  obs-fold handling, line splitting, duplicate rule, quoting lists, scheme requirements,
+  Basic charset and ext-value checks, CLI exit code); the suite fails for every one, and
+  is green before and after.
 
 ## Independent review
 
