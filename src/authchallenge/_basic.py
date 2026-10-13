@@ -59,7 +59,7 @@ def decode_basic(credentials: str | Credentials, *, charset: str = "utf-8") -> t
     The text after the first colon is the password, as RFC 7617 section 2 says.
     """
     if isinstance(credentials, str):
-        scheme, _, token68 = credentials.strip(" \t").partition(" ")
+        scheme, _, token68 = credentials.strip(" \t").replace("\t", " ").partition(" ")
         token68 = token68.strip(" ")
     else:
         scheme, token68 = credentials.scheme, credentials.token68 or ""

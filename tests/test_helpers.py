@@ -51,6 +51,7 @@ def test_basic_encoding_refuses_what_rfc_7617_forbids(
 def test_basic_decoding_accepts_parsed_credentials_and_any_case() -> None:
     assert decode_basic(Credentials("BASIC", "dTpw")) == ("u", "p")
     assert decode_basic("  basic   dTpw  ") == ("u", "p")
+    assert decode_basic("Basic\tdTpw") == ("u", "p")
 
 
 @pytest.mark.parametrize(
