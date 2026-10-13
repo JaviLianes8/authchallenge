@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from authchallenge import parse_authorization, parse_challenges
 
 

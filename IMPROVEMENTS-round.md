@@ -3,11 +3,11 @@
 Progress:
 - [x] Brainstorm ranked improvements (this file)
 - [x] Pin the ground truth: RFC 9110, RFC 9112, RFC 7235, RFC 7617, RFC 7616, RFC 6750, RFC 8187, the greenbytes httpauth test cases
-- [ ] Scanner rewrite: list grammar, obs-fold, first duplicate wins, token68 never mixed with params, several field lines
-- [ ] Strict mode: generic grammar of RFC 9110 section 11 with reasons
-- [ ] Scheme rules: Basic, Bearer and Digest checks shared by strict parsing and building
-- [ ] Safe builder: no CR, LF or other controls, sender quoting rules, realm always quoted, duplicate names refused
-- [ ] Helpers: Basic encode and decode, Bearer challenge, Authentication-Info, ext-value, challenge selection
+- [x] Scanner rewrite: list grammar, obs-fold, first duplicate wins, token68 never mixed with params, several field lines
+- [x] Strict mode: generic grammar of RFC 9110 section 11 with reasons
+- [x] Scheme rules: Basic, Bearer and Digest checks shared by strict parsing and building
+- [x] Safe builder: no CR, LF or other controls, sender quoting rules, realm always quoted, duplicate names refused
+- [x] Helpers: Basic encode and decode, Bearer challenge, Authentication-Info, ext-value, challenge selection
 - [ ] Command line
 - [ ] Contracts: pinned sources, greenbytes corpus, README examples, installed wheel
 - [ ] Docs and packaging: README, CHANGELOG, metadata, sdist contents
