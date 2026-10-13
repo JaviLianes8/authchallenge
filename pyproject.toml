@@ -4,24 +4,38 @@ build-backend = "hatchling.build"
 
 [project]
 name = "authchallenge"
-version = "0.1.0"
-description = "Parse and build HTTP WWW-Authenticate, Proxy-Authenticate and Authorization headers per RFC 7235, zero dependencies"
+version = "0.2.0"
+description = "Parse, validate and safely build HTTP WWW-Authenticate, Authorization and Authentication-Info headers per RFC 9110, typed and zero-dependency"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = []
+keywords = ["http", "authentication", "www-authenticate", "authorization", "proxy-authenticate", "authentication-info", "basic", "digest", "bearer", "rfc9110", "rfc7235", "rfc7617", "rfc7616", "rfc6750"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
 dependencies = []
 
 [project.optional-dependencies]
 dev = ["ruff", "mypy", "pytest", "build", "twine"]
+
+[project.scripts]
+authchallenge = "authchallenge._cli:main"
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
@@ -33,6 +47,15 @@ Funding = "https://buymeacoffee.com/jlianesglrs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/authchallenge"]
+
+[tool.hatch.build.targets.sdist]
+# Third-party reference files are fetched locally and never shipped; only their manifest is.
+exclude = [
+    ".github",
+    "IMPROVEMENTS-round*.md",
+    "tests/upstream/*.txt",
+    "tests/upstream/*.html",
+]
 
 [tool.ruff]
 line-length = 100

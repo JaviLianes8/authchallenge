@@ -8,9 +8,9 @@ Progress:
 - [x] Scheme rules: Basic, Bearer and Digest checks shared by strict parsing and building
 - [x] Safe builder: no CR, LF or other controls, sender quoting rules, realm always quoted, duplicate names refused
 - [x] Helpers: Basic encode and decode, Bearer challenge, Authentication-Info, ext-value, challenge selection
-- [ ] Command line
+- [x] Command line
 - [ ] Contracts: pinned sources, greenbytes corpus, README examples, installed wheel
-- [ ] Docs and packaging: README, CHANGELOG, metadata, sdist contents
+- [x] Docs and packaging: README, CHANGELOG, metadata, sdist contents
 - [ ] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Mutation run: removing guarded logic makes the suite fail
 - [ ] Independent review findings fixed with regression tests
