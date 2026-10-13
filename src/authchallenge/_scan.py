@@ -120,7 +120,7 @@ def classify(offset: int, raw: str, strict: bool) -> Item:
         return item
     rest_at = at + len(text) - len(rest)
     if is_token68(rest):
-        item.token68, item.open = rest, False
+        item.token68 = rest
     elif not _read_param(item, rest, rest_at):
         item.error, item.error_at = "expected a token68 or an auth-param", rest_at
     if "\t" in space:
