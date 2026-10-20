@@ -21,6 +21,30 @@ Progress:
 - [ ] Independent reviewer reports PASS (item 16)
 - [ ] Merge and publish (item 17), by the maintainer
 
+## Scorecard
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Public API reviewed for stability | PASS: 15 names kept from 0.2.0 and pinned; every change in the CHANGELOG |
+| 2 | `__all__` exact, no private imports in docs | PASS |
+| 3 | Docstrings with runnable examples, doctests | PASS: doctests, README and GUIDE examples run as tests |
+| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed`, a consumer checked against the install |
+| 5 | Typed, documented, bounded errors | PASS: `AuthError` (a `ValueError`), `TypeError` for wrong types, 40-character quotes, no token68 |
+| 6 | Contract tests of every public name | PASS |
+| 7 | Real ground truth | PASS: 8 fetched sources with a hash manifest, greenbytes, curl, httpx, requests, werkzeug, urllib, PyPI 0.2.0 |
+| 8 | Real e2e from the wheel | PASS: wheel in a fresh venv, CLI by subprocess, upgrade in place from PyPI 0.2.0 |
+| 9 | Seeded fuzz, no crash, hang or blowup | PASS |
+| 10 | Supported Pythons | PASS: CPython 3.10 to 3.14 and 3.14 free-threaded |
+| 11 | README and `twine check` | PASS |
+| 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-20 |
+| 13 | pyproject 1.0.0, Production/Stable | PASS |
+| 14 | sdist and wheel contents | PASS |
+| 15 | Gates each exit 0 | PASS: see Gates |
+| 16 | Independent reviewer | pending |
+| 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
+| 18 | Contracts bite (mutations) | PASS: 43 author mutants, all killed |
+| 19 | Five independent QA lenses | pending |
+
 ## Baseline on 0.2.0 (before any change)
 
 At d087552 on this PC, CPython 3.13.2: `ruff format --check .`, `ruff check .` and
@@ -100,7 +124,7 @@ Nothing fetched is committed or shipped.
 Authentication-Info accept exactly what the hand-written RFC 9110 recognizer accepts
 (6,000 strings per seed and field), tolerant mode never raises and agrees with strict mode
 where strict accepts, built headers read back strictly to the same values, the codecs round
-trip and refuse garbage with `AuthError` only. `tests/test_hostile.py`: eleven input shapes
+trip and refuse garbage with `AuthError` only. `tests/test_hostile.py`: 17 input shapes
 (commas, folds, line breaks, runs of spaces and tabs, schemes, high octets...) through all
 six parser calls stay linear at eight times the input, many field lines, megabyte input to
 the codecs, a large dump through the command line, and no recursion.
@@ -122,25 +146,27 @@ gives one answer on every version; the CHANGELOG lists it under Fixed, the contr
 `tests/test_contract_edges.py`, and the 0.2.0 oracle now asks the running Python's base64
 module whether 0.2.0 could have accepted a token.
 
-- At 1d595e7, from a fresh clone on the laptop: `python -m build`, `twine check --strict`
-  (both PASSED), wheel 25,251 bytes and sdist 53,485 bytes. The wheel holds the package, `py.typed`,
-  the entry point and LICENSE; the sdist holds the sources, tests, scripts, docs, LICENSE
-  and `tests/upstream/MANIFEST.json`, and no fetched file, report or scratch file.
-- `AUTHCHALLENGE_E2E=1 AUTHCHALLENGE_E2E_PYPI=1` full suite (CPython 3.14.6): the e2e test
-  builds the wheel, installs PyPI 0.2.0 in a fresh venv, upgrades it in place to the wheel,
-  drives the installed package from an empty folder with `-I`, type checks a consumer with
-  `mypy --strict` against the install, and runs the CLI as `python -m authchallenge` and as
-  the `authchallenge` script. 411 passed and 1 skipped (curl there refuses Digest through
-  the system); the 0.2.0 oracle tests were re-run separately with the right folder.
+- At 23b8908, from a fresh clone on Elena's PC: `python -m build`, `twine check --strict`
+  (both PASSED), wheel 25,251 bytes and sdist 53,479 bytes. The wheel holds the package,
+  `py.typed`, the entry point and LICENSE; the sdist holds the sources, tests, scripts,
+  docs, LICENSE and `tests/upstream/MANIFEST.json`, and no fetched file, report or scratch
+  file.
+- `AUTHCHALLENGE_E2E=1 AUTHCHALLENGE_E2E_PYPI=1` full suite (CPython 3.14.2, 0.2.0 oracle
+  present): the e2e test builds the wheel, installs PyPI 0.2.0 in a fresh venv, upgrades it
+  in place to the wheel, drives the installed package from an empty folder with `-I`, type
+  checks a consumer with `mypy --strict` against the install, and runs the CLI as
+  `python -m authchallenge` and as the `authchallenge` script. 415 passed, 1 skipped (curl
+  there refuses Digest through the system; on this PC curl answers it).
 - The wheel installed in a fresh venv per interpreter and the sdist's own suite run with
-  `src` removed, fetched sources, httpx 0.27.0, requests 2.32.3, werkzeug 3.1.3 present:
-  CPython 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.8 and 3.14.8 free-threaded, 398 passed
-  and 2 skipped each (the opt-in e2e test and curl's Digest). The 0.2.0 oracle and the edge
-  contracts (32 tests) passed on each of them. The same interpreters ran the earlier head
-  on Elena's PC. 3.8 and 3.9 are below `requires-python`.
+  `src` removed (fetched sources, the 0.2.0 oracle, httpx 0.27.0, requests 2.32.3 and
+  werkzeug 3.1.3 present): CPython 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.8 and 3.14.8
+  free-threaded, 398 passed and 2 skipped each (the opt-in e2e test and curl's Digest).
+  3.8 and 3.9 are below `requires-python`. Heavy runs go to the other machines, so these
+  interpreters were installed there with uv; this PC holds 3.10.19, 3.11.5, 3.12.12, 3.13.2
+  and 3.14.2 (with and without the GIL), and 3.11.5 and 3.13.2 ran the changed tests here.
 
 ## Gates (item 15)
 
-At 1d595e7 from a fresh clone on the laptop, each command on its own: `ruff format --check .`,
-`ruff check .`, `mypy --strict src` and `mypy --strict src tests` exit 0, and `pytest`
-passes as above.
+At 23b8908 from a fresh clone on Elena's PC, each command on its own: `ruff format --check .`,
+`ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` (as above)
+exit 0.
