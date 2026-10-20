@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import io
 import sys
 import time
@@ -34,14 +35,19 @@ SHAPES: dict[str, Callable[[int], str]] = {
 
 
 def _best(call: Callable[[], object]) -> float:
+    """The fastest of three runs, without the cyclic collector, which adds noise."""
     times = []
-    for _ in range(3):
-        start = time.perf_counter()
-        try:
-            call()
-        except ac.AuthError as error:
-            assert len(str(error)) < 300
-        times.append(time.perf_counter() - start)
+    gc.disable()
+    try:
+        for _ in range(3):
+            start = time.perf_counter()
+            try:
+                call()
+            except ac.AuthError as error:
+                assert len(str(error)) < 300
+            times.append(time.perf_counter() - start)
+    finally:
+        gc.enable()
     return min(times)
 
 
@@ -58,11 +64,11 @@ def _calls(text: str) -> list[Callable[[], object]]:
 
 @pytest.mark.parametrize("shape", sorted(SHAPES))
 def test_every_shape_is_linear(shape: str) -> None:
-    small, large = SHAPES[shape](25_000), SHAPES[shape](100_000)
+    small, large = SHAPES[shape](12_500), SHAPES[shape](100_000)
     for quick, slow in zip(_calls(small), _calls(large), strict=True):
-        base = max(_best(quick), 0.002)
-        # Four times the input: linear code takes about four times as long, quadratic 16.
-        assert _best(slow) < base * 10, shape
+        base = max(_best(quick), 0.001)
+        # Eight times the input: linear code takes about eight times as long, quadratic 64.
+        assert _best(slow) < base * 24, shape
 
 
 def test_many_field_lines_are_linear() -> None:
