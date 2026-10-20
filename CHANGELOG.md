@@ -27,8 +27,15 @@ tolerant and strict parsing will only change in a new major version.
   `decode_basic` and the builders used to repeat the whole base64 credentials (a
   password) or a megabyte of input in the message. Strict errors about credentials quote
   none of their text (no param name, which may be a mangled secret), and say
-  "outside the credentials" rather than "outside a challenge". `decode_basic` no longer
-  quotes what it read as the scheme of a `str` value.
+  "outside the credentials" rather than "outside a challenge"; a malformed Digest
+  `username*` is reported without its value, language or charset, and a character a
+  field value cannot hold by its offset alone. `decode_basic` no longer quotes what it
+  read as the scheme, of a `str` value or of `Credentials` (whose scheme holds the
+  base64 when a value without a scheme was parsed tolerantly): it says "the scheme is
+  not Basic".
+- A `TypeError` raised by the caller's iterable while `select_challenge`,
+  `parse_challenges` or `parse_auth_info` iterates it propagates unchanged, instead of
+  being replaced by a message about the argument's type.
 - Basic errors chain no `UnicodeError` or base64 error: those held the whole
   `user:password` and every traceback printed them.
 - `encode_ext_value` raises `AuthError` for text with a lone surrogate instead of

@@ -45,14 +45,18 @@ def fail(reason: str, offset: int) -> AuthError:
     return AuthError(f"{reason} at offset {offset}")
 
 
-def prepare(value: str, strict: bool) -> str:
-    """Unfold obs-fold and, in strict mode, refuse it and any character a field cannot hold."""
+def prepare(value: str, strict: bool, quiet: bool = False) -> str:
+    """Unfold obs-fold and, in strict mode, refuse it and any character a field cannot hold.
+
+    With `quiet`, for credentials, the error gives the offset without the character."""
     if strict:
         fold = _OBS_FOLD.search(value)
         if fold is not None:
             raise fail("obsolete line folding", fold.start())
         bad = bad_octet(value)
         if bad is not None:
+            if quiet:
+                raise fail("a character a field value cannot hold", bad)
             raise fail(f"character {value[bad]!r} is not allowed in a field value", bad)
         return value
     return _OBS_FOLD.sub(" ", value)

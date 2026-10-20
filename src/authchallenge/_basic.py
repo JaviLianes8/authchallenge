@@ -113,7 +113,7 @@ def decode_basic(credentials: str | Credentials, *, charset: str = "utf-8") -> t
     else:
         raise TypeError(f"expected a str or Credentials, not {type(credentials).__name__}")
     if scheme.lower() != "basic":
-        # Read from a str, the would-be scheme may be the base64 itself: never quote it.
-        named = shown(scheme) if isinstance(credentials, Credentials) else "the scheme is not Basic"
-        raise AuthError(f"not Basic credentials: {named}")
+        # The would-be scheme may be the base64 itself, even in Credentials parsed from a
+        # value without a scheme: never quote it.
+        raise AuthError("not Basic credentials: the scheme is not Basic")
     return split_user_pass(token68, charset)

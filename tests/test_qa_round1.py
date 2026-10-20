@@ -67,7 +67,18 @@ def test_space_then_tab_before_the_comma_is_valid() -> None:
     assert found == [ac.Challenge("Newauth", params={"x": "1"})]
 
 
-BAD_LANGUAGES = ["1", "-", "en--US", "abcdefghijk", "en-", "x", "en-a", "en-a-b", "i-foo"]
+BAD_LANGUAGES = [
+    "1",
+    "-",
+    "en--US",
+    "abcdefghijk",
+    "en-",
+    "x",
+    "en-a",
+    "en-a-b",
+    "i-foo",
+    "zh-abc-def-ghi-jkl",
+]
 GOOD_LANGUAGES = [
     "",
     "en",
@@ -82,6 +93,9 @@ GOOD_LANGUAGES = [
     "i-klingon",
     "zh-min-nan",
     "en-GB-oed",
+    "zh-abc-def",
+    "zh-abc-def-ghi",
+    "abcd",
 ]
 
 

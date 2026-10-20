@@ -30,7 +30,7 @@ def line_items(value: str, strict: bool, kind: str = "challenge") -> list[list[I
     """Items of each line. Strict mode refuses line breaks; tolerant mode reads a bare one
     (not obs-fold) as the end of a field line, so the next line keeps its challenges.
     Errors in credentials never quote the input, which may be a mangled secret."""
-    text = prepare(value, strict)
+    text = prepare(value, strict, kind == "credentials")
     lines = [text] if strict else text.replace("\r\n", "\n").split("\n")
     result: list[list[Item]] = []
     for line in lines:
@@ -102,11 +102,12 @@ def each_line(value: str | Iterable[str], read: Callable[[str], _T]) -> list[_T]
         raise TypeError("field values must be str, not bytes: decode them as latin-1 first")
     else:
         try:
-            lines = list(value)
+            iterator = iter(value)
         except TypeError:
             raise TypeError(
                 f"expected a str or an iterable of str, not {type(value).__name__}"
             ) from None
+        lines = list(iterator)  # a TypeError raised while iterating is the caller's own
         for line in lines:
             need_str(line, "each field line")
     results: list[_T] = []
