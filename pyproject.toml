@@ -53,6 +53,7 @@ packages = ["src/authchallenge"]
 exclude = [
     ".github",
     "IMPROVEMENTS-round*.md",
+    "CERT-1.0-*.md",
     "tests/upstream/*.txt",
     "tests/upstream/*.html",
 ]
