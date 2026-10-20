@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 # tchar of RFC 9110 section 5.6.2: auth-scheme and auth-param names are tokens.
 TCHAR = "!#$%&'*+-.^_`|~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -60,4 +61,16 @@ def unquote(value: str) -> str:
     """Strip the quotes of a quoted-string and resolve its quoted-pairs."""
     if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
         return _QUOTED_PAIR.sub(r"\1", value[1:-1])
+    return value
+
+
+def shown(value: str, limit: int = 40) -> str:
+    """Quote a value for an error message, cut to `limit` characters so input never floods it."""
+    return repr(value if len(value) <= limit else value[:limit] + "...")
+
+
+def need_str(value: Any, what: str) -> str:
+    """Return the value if it is a str, else raise TypeError naming the argument."""
+    if not isinstance(value, str):
+        raise TypeError(f"{what} must be a str, not {type(value).__name__}")
     return value

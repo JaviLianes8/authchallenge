@@ -6,7 +6,37 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.2.0] - unreleased
+## [1.0.0] - 2026-10-19
+
+The public API is now stable: the fifteen names of `__all__`, their signatures,
+parameter names and defaults, the `AuthError` type and the documented behaviour of
+tolerant and strict parsing will only change in a new major version.
+
+### Changed
+
+- Arguments of the wrong type raise `TypeError` with the argument's name. In 0.2.0
+  the builders raised `AuthError` for a scheme, token68, param name or value that was
+  not a `str`, and the other functions leaked `AttributeError` or a `TypeError` from
+  deep inside (for example `parse_challenges(b"...")`, `decode_basic(None)`,
+  `select_challenge([...], 1)`, `build_challenge("X", [("a", "b")])`).
+- `parse_challenges` and `parse_auth_info` refuse `bytes` with a `TypeError` that says
+  to decode them as latin-1.
+- Error messages quote at most 40 characters of the input, and never a token68:
+  `decode_basic` and the builders used to repeat the whole base64 credentials (a
+  password) or a megabyte of input in the message.
+- `encode_ext_value` raises `AuthError` for text with a lone surrogate instead of
+  `UnicodeEncodeError`.
+- `repr(Credentials(...))` shows `token68=<hidden>`, so logging parsed credentials does
+  not log the secret; the `token68` attribute is unchanged.
+- `AuthError`, `Challenge` and `Credentials` report `authchallenge` as their module.
+- `build_challenge` and `build_authorization` with `params=[]` (or another empty value
+  that is not a mapping) raise `TypeError` instead of building a bare scheme.
+
+### Added
+
+- Runnable examples in every public docstring, run as doctests.
+
+## [0.2.0] - 2026-10-19
 
 ### Security
 

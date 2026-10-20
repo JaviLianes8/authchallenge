@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ._grammar import QUOTED_RE, TOKEN_RE, bad_octet, is_token68, unquote
+from ._grammar import QUOTED_RE, TOKEN_RE, bad_octet, is_token68, shown, unquote
 from ._model import AuthError
 
 _PARAM = re.compile(rf"({TOKEN_RE})[ \t]*=[ \t]*({QUOTED_RE}|{TOKEN_RE})", re.DOTALL)
@@ -91,7 +91,7 @@ def _read_param(item: Item, text: str, offset: int) -> bool:
     item.param = param
     rest = text[match.end() :]
     if rest:
-        item.error = f"unexpected text after the value of {param.name!r}"
+        item.error = f"unexpected text after the value of {shown(param.name)}"
         item.error_at = offset + len(text) - len(rest.lstrip(" \t"))
         if not param.quoted and rest[0] not in " \t":
             item.param = None  # a token cut short by a stray character is not the value

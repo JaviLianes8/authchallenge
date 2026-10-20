@@ -6,7 +6,7 @@ import base64
 import binascii
 import codecs
 
-from ._grammar import is_token68
+from ._grammar import is_token68, need_str, shown
 from ._model import AuthError, Credentials
 
 
@@ -18,18 +18,19 @@ def _has_control(text: str) -> bool:
 def _codec(charset: str) -> str:
     # RFC 7617 needs an encoding that maps US-ASCII to single octets: UTF-8 or ISO-8859-1.
     try:
-        name = codecs.lookup(charset).name
+        name = codecs.lookup(need_str(charset, "charset")).name
     except LookupError:
         name = ""
     if name not in ("utf-8", "iso8859-1"):
-        raise AuthError(f"unsupported Basic charset {charset!r}: use 'utf-8' or 'latin-1'")
+        raise AuthError(f"unsupported Basic charset {shown(charset)}: use 'utf-8' or 'latin-1'")
     return name
 
 
 def split_user_pass(token68: str, charset: str) -> tuple[str, str]:
     """Decode a Basic token68 into (user-id, password), raising AuthError when malformed."""
+    # The token68 carries the password: no message ever quotes it.
     if not is_token68(token68):
-        raise AuthError(f"invalid token68: {token68!r}")
+        raise AuthError("invalid token68: Basic credentials are base64 after the scheme")
     try:
         raw = base64.b64decode(token68, validate=True)
     except (binascii.Error, ValueError) as error:
@@ -53,7 +54,15 @@ def encode_basic(user_id: str, password: str, *, charset: str = "utf-8") -> str:
     UTF-8 is what a server asks for with `charset="UTF-8"`; pass "latin-1" for servers
     that expect ISO-8859-1; other charsets raise AuthError. The text is encoded as
     given, without Unicode normalisation.
+
+    >>> from authchallenge import encode_basic
+    >>> encode_basic("Aladdin", "open sesame")
+    'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='
+    >>> encode_basic("test", "123£", charset="latin-1")
+    'Basic dGVzdDoxMjOj'
     """
+    need_str(user_id, "user_id")
+    need_str(password, "password")
     if ":" in user_id:
         raise AuthError("a Basic user-id cannot contain ':'")
     if _has_control(user_id) or _has_control(password):
@@ -70,12 +79,24 @@ def decode_basic(credentials: str | Credentials, *, charset: str = "utf-8") -> t
 
     Accepts the Authorization field value (`Basic QWxh...`) or a parsed `Credentials`.
     The text after the first colon is the password, as RFC 7617 section 2 says.
+    Error messages never quote the base64 text, which carries the password.
+
+    >>> from authchallenge import decode_basic, parse_authorization
+    >>> decode_basic("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==")
+    ('Aladdin', 'open sesame')
+    >>> decode_basic(parse_authorization("Basic dGVzdDoxMjPCow=="))
+    ('test', '123£')
     """
     if isinstance(credentials, str):
-        scheme, _, token68 = credentials.strip(" \t").replace("\t", " ").partition(" ")
+        scheme, space, token68 = credentials.strip(" \t").replace("\t", " ").partition(" ")
         token68 = token68.strip(" ")
+        if not space and scheme.lower() != "basic":
+            # Without a space the text may be a bare token68, so it is never quoted.
+            raise AuthError("not Basic credentials: the value lacks the 'Basic' scheme")
+    elif isinstance(credentials, Credentials):
+        scheme, token68 = need_str(credentials.scheme, "scheme"), credentials.token68 or ""
     else:
-        scheme, token68 = credentials.scheme, credentials.token68 or ""
+        raise TypeError(f"expected a str or Credentials, not {type(credentials).__name__}")
     if scheme.lower() != "basic":
-        raise AuthError(f"not Basic credentials: {scheme!r}")
+        raise AuthError(f"not Basic credentials: {shown(scheme)}")
     return split_user_pass(token68, charset)
