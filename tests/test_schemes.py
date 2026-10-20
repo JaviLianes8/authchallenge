@@ -74,7 +74,7 @@ def test_valid_challenges(value: str) -> None:
         (CREDS + ", username*=UTF-8''u", "exactly one of username and username\\*"),
         (CREDS.replace('username="u"', "x=1"), "exactly one of username and username\\*"),
         (CREDS.replace('username="u"', "username*=\"UTF-8''u\""), "is an ext-value"),
-        (CREDS.replace('username="u"', "username*=latin1''u"), "unsupported ext-value"),
+        (CREDS.replace('username="u"', "username*=latin1''u"), "is not a valid ext-value"),
         (CREDS.replace(', cnonce="c"', ""), "Digest needs the 'cnonce' parameter"),
         (CREDS.replace(', uri="/"', ""), "Digest needs the 'uri' parameter"),
     ],
