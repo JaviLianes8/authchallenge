@@ -49,12 +49,16 @@ def server() -> Iterator[tuple[str, list[str]]]:
         httpd.server_close()
 
 
-def _curl(*args: str) -> None:
+def _curl(*args: str, seen: list[str] | None = None) -> None:
     curl = shutil.which("curl")
     if curl is None:
         pytest.skip("curl is not installed")
-    done = subprocess.run([curl, "-s", "-o", "-", *args], capture_output=True, timeout=60)
-    assert done.returncode == 0, done.stderr
+    done = subprocess.run([curl, "-sS", "-o", "-", *args], capture_output=True, timeout=60)
+    if done.returncode == 67 and seen == []:
+        # Windows builds hand Digest to the system (SSPI); some accounts refuse it locally
+        # ("Login denied") before any credentials are sent: nothing to compare.
+        pytest.skip(f"this curl refused to compute Digest: {done.stderr!r}")
+    assert done.returncode == 0, (done.returncode, done.stderr)
 
 
 def test_curl_basic_matches_encode_basic(server: tuple[str, list[str]]) -> None:
@@ -75,7 +79,7 @@ def test_curl_bearer_is_read_strictly(server: tuple[str, list[str]]) -> None:
 
 def test_curl_answers_our_digest_challenge(server: tuple[str, list[str]]) -> None:
     url, seen = server
-    _curl("--digest", "-u", f"{USER}:{PASSWORD}", url + URI)
+    _curl("--digest", "-u", f"{USER}:{PASSWORD}", url + URI, seen=seen)
     assert len(seen) == 1
     try:
         params = check_digest_credentials(seen[0], algorithm="MD5")
