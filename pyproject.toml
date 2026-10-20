@@ -39,7 +39,7 @@ authchallenge = "authchallenge._cli:main"
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
-Repository = "https://github.com/JaviLianes8/authchallenge"
+Source = "https://github.com/JaviLianes8/authchallenge"
 Issues = "https://github.com/JaviLianes8/authchallenge/issues"
 Changelog = "https://github.com/JaviLianes8/authchallenge/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
