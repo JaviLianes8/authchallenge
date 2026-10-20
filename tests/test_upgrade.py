@@ -77,7 +77,7 @@ def _base64_accepts(token: str) -> bool:
 
 def _padding_fix(before: Any, after: Any, text: str) -> bool:
     """The documented Basic fix: surplus padding this Python's base64 module decodes."""
-    token = text.strip(" 	").split(" ")[-1]
+    token = text.strip(" \t").split(" ")[-1]
     padding = len(token) - len(token.rstrip("="))
     surplus = len(token) % 4 != 0 or padding > 2
     accepted = before is not None and before not in (("error", True), ("error", False))

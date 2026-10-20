@@ -13,10 +13,10 @@ Progress:
 - [x] Ground truth: specifications fetched live, live oracles (item 7)
 - [x] Contract, fuzz and hostile input (items 6, 9)
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
-- [ ] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
-- [ ] Author mutation round (item 18)
-- [ ] Gates (item 15), final run
-- [ ] PR and trace guard CLEAN
+- [x] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
+- [x] Author mutation round (item 18)
+- [x] Gates (item 15), final run
+- [x] PR and trace guard CLEAN
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 - [ ] Merge and publish (item 17), by the maintainer
@@ -93,3 +93,54 @@ Nothing fetched is committed or shipped.
 - PyPI 0.2.0 as an oracle (`tests/test_upgrade.py`, `AUTHCHALLENGE_V02`): 80,000 parser
   calls and 50,000 builder and codec calls give the same results and error families;
   the documented changes are checked case by case.
+
+## Fuzz and hostile input (item 9)
+
+`tests/test_fuzz.py`, seeds 1, 20261019 and 987654321: strict challenges, credentials and
+Authentication-Info accept exactly what the hand-written RFC 9110 recognizer accepts
+(6,000 strings per seed and field), tolerant mode never raises and agrees with strict mode
+where strict accepts, built headers read back strictly to the same values, the codecs round
+trip and refuse garbage with `AuthError` only. `tests/test_hostile.py`: eleven input shapes
+(commas, folds, line breaks, runs of spaces and tabs, schemes, high octets...) through all
+six parser calls stay linear at eight times the input, many field lines, megabyte input to
+the codecs, a large dump through the command line, and no recursion.
+
+## Author mutation round (item 18)
+
+40 mutants over every module, each applied alone to a fresh clone of the pushed branch on
+another machine and run against the full suite: all 40 killed. Three more on the padding
+fix and the strict tab rule, run on the interpreters where they can change behaviour, are
+killed too. The table is in
+[CERT-1.0-MUTANTS.md](https://github.com/JaviLianes8/authchallenge/blob/main/CERT-1.0-MUTANTS.md).
+
+## Packaging, e2e and Pythons (items 8, 10, 13, 14)
+
+The interpreter matrix found a real defect: on some CPython 3.10 and 3.11 releases
+`base64.b64decode(validate=True)` accepts surplus padding, so `decode_basic` decoded
+`Basic QWxhZGRpbjpvcGVu=` (and 0.2.0 does the same there). The length check before decoding
+gives one answer on every version; the CHANGELOG lists it under Fixed, the contracts are in
+`tests/test_contract_edges.py`, and the 0.2.0 oracle now asks the running Python's base64
+module whether 0.2.0 could have accepted a token.
+
+- At 1d595e7, from a fresh clone on the laptop: `python -m build`, `twine check --strict`
+  (both PASSED), wheel 25,251 bytes and sdist 53,485 bytes. The wheel holds the package, `py.typed`,
+  the entry point and LICENSE; the sdist holds the sources, tests, scripts, docs, LICENSE
+  and `tests/upstream/MANIFEST.json`, and no fetched file, report or scratch file.
+- `AUTHCHALLENGE_E2E=1 AUTHCHALLENGE_E2E_PYPI=1` full suite (CPython 3.14.6): the e2e test
+  builds the wheel, installs PyPI 0.2.0 in a fresh venv, upgrades it in place to the wheel,
+  drives the installed package from an empty folder with `-I`, type checks a consumer with
+  `mypy --strict` against the install, and runs the CLI as `python -m authchallenge` and as
+  the `authchallenge` script. 411 passed and 1 skipped (curl there refuses Digest through
+  the system); the 0.2.0 oracle tests were re-run separately with the right folder.
+- The wheel installed in a fresh venv per interpreter and the sdist's own suite run with
+  `src` removed, fetched sources, httpx 0.27.0, requests 2.32.3, werkzeug 3.1.3 present:
+  CPython 3.10.22, 3.11.17, 3.12.15, 3.13.16, 3.14.8 and 3.14.8 free-threaded, 398 passed
+  and 2 skipped each (the opt-in e2e test and curl's Digest). The 0.2.0 oracle and the edge
+  contracts (32 tests) passed on each of them. The same interpreters ran the earlier head
+  on Elena's PC. 3.8 and 3.9 are below `requires-python`.
+
+## Gates (item 15)
+
+At 1d595e7 from a fresh clone on the laptop, each command on its own: `ruff format --check .`,
+`ruff check .`, `mypy --strict src` and `mypy --strict src tests` exit 0, and `pytest`
+passes as above.
