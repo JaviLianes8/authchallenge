@@ -85,6 +85,10 @@ def _padding_fix(before: Any, after: Any, text: str) -> bool:
     return lenient and surplus and after == ("error", True)
 
 
+def _has_control(text: str) -> bool:
+    return any(ord(char) < 0x20 or 0x7F <= ord(char) < 0xA0 for char in text)
+
+
 @pytest.mark.parametrize("seed", [7, 8])
 def test_parsers_answer_as_0_2_0(old: ModuleType, seed: int) -> None:
     rng = random.Random(seed)
@@ -127,7 +131,9 @@ def test_builders_and_codecs_answer_as_0_2_0(old: ModuleType, seed: int) -> None
             ("encode_basic", (text.replace(":", ""), text)),
         ):
             before, after = _outcome(old, name, *args), _outcome(ac, name, *args)
-            if not (name == "decode_basic" and _padding_fix(before, after, args[0])):
+            if name == "encode_ext_value" and _has_control(text):
+                assert after == ("error", True), text  # documented: it no longer encodes them
+            elif not (name == "decode_basic" and _padding_fix(before, after, args[0])):
                 assert before == after, (name, args)
 
 
@@ -156,3 +162,19 @@ def test_documented_changes_against_0_2_0(old: ModuleType) -> None:
             ac.decode_basic("Basic " + token)
         if _base64_accepts(token):  # some CPython 3.10 and 3.11 releases
             assert old.decode_basic("Basic " + token)[0] in ("u", "Aladdin")
+
+
+def test_changes_of_the_first_qa_round_against_0_2_0(old: ModuleType) -> None:
+    assert old.encode_ext_value("a\nb") == "UTF-8''a%0Ab"
+    with pytest.raises(ac.AuthError):
+        ac.encode_ext_value("a\nb")
+    assert old.decode_ext_value("UTF-8'1'abc") == "abc"
+    with pytest.raises(ac.AuthError):
+        ac.decode_ext_value("UTF-8'1'abc")
+    assert old.parse_challenges("Newauth\t ,x=1", strict=True)[0].params == {"x": "1"}
+    with pytest.raises(ac.AuthError, match="outside a challenge"):
+        ac.parse_challenges("Newauth\t ,x=1", strict=True)
+    with pytest.raises(ValueError, match="embedded null"):
+        old.encode_basic("a", "b", charset="utf\x00-8")
+    with pytest.raises(ac.AuthError):
+        ac.encode_basic("a", "b", charset="utf\x00-8")

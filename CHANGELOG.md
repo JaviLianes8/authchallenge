@@ -18,14 +18,31 @@ tolerant and strict parsing will only change in a new major version.
   the builders raised `AuthError` for a scheme, token68, param name or value that was
   not a `str`, and the other functions leaked `AttributeError` or a `TypeError` from
   deep inside (for example `parse_challenges(b"...")`, `decode_basic(None)`,
-  `select_challenge([...], 1)`, `build_challenge("X", [("a", "b")])`).
+  `select_challenge([...], 1)`, `build_challenge("X", [("a", "b")])`). This covers
+  `select_challenge` given something that is not iterable or a `Challenge` whose scheme
+  is not a `str`, and `decode_basic` given `Credentials` whose token68 is not a `str`.
 - `parse_challenges` and `parse_auth_info` refuse `bytes` with a `TypeError` that says
   to decode them as latin-1.
 - Error messages quote at most 40 characters of the input, and never a token68:
   `decode_basic` and the builders used to repeat the whole base64 credentials (a
-  password) or a megabyte of input in the message.
+  password) or a megabyte of input in the message. Strict errors about credentials quote
+  none of their text (no param name, which may be a mangled secret), and say
+  "outside the credentials" rather than "outside a challenge". `decode_basic` no longer
+  quotes what it read as the scheme of a `str` value.
+- Basic errors chain no `UnicodeError` or base64 error: those held the whole
+  `user:password` and every traceback printed them.
 - `encode_ext_value` raises `AuthError` for text with a lone surrogate instead of
-  `UnicodeEncodeError`.
+  `UnicodeEncodeError`, and for text with a control character (C0, DEL or C1), which
+  `decode_ext_value` and strict Digest `username*` refuse; 0.2.0 encoded it. Whatever
+  it returns now decodes back to the same text.
+- `decode_ext_value` (and strict Digest `username*`) refuse a language that is not an
+  RFC 5646 language tag, such as `UTF-8'1'abc`; 0.2.0 accepted any letters, digits and
+  hyphens there.
+- A Basic charset with a NUL character raises `AuthError` instead of `ValueError`.
+- The command line reads stdin as octets decoded as latin-1, as the library documents
+  for received field values, instead of the locale's encoding, so its verdict on
+  obs-text no longer depends on the platform. Only LF (with an optional CR) ends a line:
+  form feed, vertical tab, U+0085 and the other Unicode line breaks stay in the value.
 - `repr(Credentials(...))` shows `token68=<hidden>`, so logging parsed credentials does
   not log the secret; the `token68` attribute is unchanged.
 - `AuthError`, `Challenge` and `Credentials` report `authchallenge` as their module.
@@ -34,9 +51,16 @@ tolerant and strict parsing will only change in a new major version.
 
 ### Fixed
 
-- Strict `parse_authorization` refuses anything but a space right after the scheme, such
-  as `Basic,` or a tab followed by more text: credentials are one element, not a list,
-  so the empty list elements a challenge may hold do not apply. 0.2.0 accepted them.
+- Strict `parse_authorization` refuses a comma or tab right after the scheme of
+  credentials whose scheme has no rules of its own, such as `Newauth,` or `Newauth\t ,`:
+  credentials are one element, not a list, so the empty list elements a challenge may
+  hold do not apply. 0.2.0 accepted them. Basic and Bearer credentials such as `Basic,`
+  or `Basic\tdTpw` were already refused; `Basic,` now gets the clearer message.
+- Strict `parse_challenges` refuses params after a scheme followed by a tab and then a
+  space before the comma (`Newauth\t ,x=1`): RFC 9110 asks for a space first. 0.2.0
+  accepted it.
+- The command line reads a header dump with folded lines in linear time; 0.2.0 took
+  seconds on a megabyte of continuation lines.
 - `decode_basic` (and strict Basic credentials) refuse base64 whose length is not a
   multiple of four or that ends in more than two `=`, on every Python. Some CPython 3.10
   and 3.11 releases accept surplus padding, so there 0.2.0 decoded
@@ -85,7 +109,9 @@ tolerant and strict parsing will only change in a new major version.
 - Builders refuse names that differ only in case and whatever strict parsing refuses,
   including a Basic challenge without realm and incomplete Digest params.
 
-## [0.1.0]
+## [0.1.0] - 2026-10-11
+
+Not published on PyPI.
 
 - Parse WWW-Authenticate and Proxy-Authenticate headers into a list of challenges, with
   multi-challenge comma disambiguation, token68 and quoted auth-params (RFC 7235).

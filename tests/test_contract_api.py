@@ -151,6 +151,10 @@ SECRET_CALLS: list[Callable[[], object]] = [
     lambda: ac.build_authorization("Basic", token68=SECRET),
     lambda: ac.parse_authorization("Basic " + SECRET, strict=True),
     lambda: ac.parse_authorization("Basic " + SECRET + " x", strict=True),
+    # token68 allows "-", base64 does not: the decode failure branch.
+    lambda: ac.decode_basic("Basic " + SECRET[:-4] + "-mV0"),
+    lambda: ac.parse_authorization("Basic " + SECRET[:-4] + "-mV0", strict=True),
+    lambda: ac.decode_basic("Basic " + SECRET + "a"),
 ]
 
 

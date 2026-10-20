@@ -117,7 +117,8 @@ authchallenge --authorization 'Bearer mF_9.B5f-4.1JqM'
 ```
 
 Values come as arguments or one per stdin line; a header dump on stdin is read for the
-authentication fields only (the first non-empty line decides which). The output is JSON.
+authentication fields only (the first non-empty line decides which). Stdin is decoded as
+latin-1, like any received field value. The output is JSON.
 `--strict` reports the first broken rule of each value on stderr and exits 1.
 
 ## API

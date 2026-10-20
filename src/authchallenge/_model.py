@@ -8,10 +8,10 @@ from dataclasses import dataclass, field
 class AuthError(ValueError):
     """Raised when a header cannot be built, or fails strict parsing, with the reason.
 
-    It is a `ValueError`. Messages name the broken rule and, for strict parsing, the
-    offset; they quote at most 40 characters of the input and never a token68, which
-    often carries a password or a bearer token. Arguments of the wrong type raise
-    `TypeError` instead.
+    It is a `ValueError`. Messages name the broken rule and, for grammar errors, the
+    offset in the field value; they quote at most 40 characters of the input and never
+    a token68, which often carries a password or a bearer token, nor any other text of
+    credentials. Arguments of the wrong type raise `TypeError` instead.
 
     >>> from authchallenge import AuthError, parse_challenges
     >>> try:

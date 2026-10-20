@@ -26,9 +26,10 @@ class Draft:
         return {name: param.value for name, param in self.params.items()}
 
 
-def line_items(value: str, strict: bool) -> list[list[Item]]:
+def line_items(value: str, strict: bool, kind: str = "challenge") -> list[list[Item]]:
     """Items of each line. Strict mode refuses line breaks; tolerant mode reads a bare one
-    (not obs-fold) as the end of a field line, so the next line keeps its challenges."""
+    (not obs-fold) as the end of a field line, so the next line keeps its challenges.
+    Errors in credentials never quote the input, which may be a mangled secret."""
     text = prepare(value, strict)
     lines = [text] if strict else text.replace("\r\n", "\n").split("\n")
     result: list[list[Item]] = []
@@ -40,42 +41,48 @@ def line_items(value: str, strict: bool) -> list[list[Item]]:
         if strict:
             for item in items:
                 if item.error:
-                    raise fail(item.error, item.error_at)
+                    quiet = kind == "credentials" and item.quiet
+                    raise fail(item.quiet if quiet else item.error, item.error_at)
         result.append(items)
     return result
 
 
-def add_param(params: dict[str, Param], param: Param, strict: bool) -> None:
+def add_param(params: dict[str, Param], param: Param, strict: bool, named: bool = True) -> None:
     if param.name in params:
         if strict:
-            raise fail(f"duplicate auth-param {shown(param.name)}", param.offset)
+            name = f" {shown(param.name)}" if named else ""
+            raise fail(f"duplicate auth-param{name}", param.offset)
         return  # the first one wins, as most user agents do
     params[param.name] = param
 
 
-def _step(drafts: list[Draft], start: int, item: Item, strict: bool) -> None:
+def _step(drafts: list[Draft], start: int, item: Item, strict: bool, kind: str) -> None:
+    named = kind != "credentials"
     if item.kind == "challenge":
         drafts.append(Draft(item.scheme, item.offset, item.token68, item.open))
         if item.param is not None:
-            add_param(drafts[-1].params, item.param, strict)
+            add_param(drafts[-1].params, item.param, strict, named)
     elif item.kind == "param" and item.param is not None:
         current = drafts[-1] if len(drafts) > start else None
         if current is None or current.token68 is not None or not current.open:
             if strict:
-                name = shown(item.param.name)
-                raise fail(f"auth-param {name} outside a challenge", item.offset)
+                where = f"{shown(item.param.name)} outside a challenge"
+                raise fail(
+                    f"auth-param {where if named else 'outside the credentials'}", item.offset
+                )
             if current is None or current.token68 is not None:
                 return
         current.open = True
-        add_param(current.params, item.param, strict)
+        add_param(current.params, item.param, strict, named)
 
 
-def read_drafts(value: str, strict: bool) -> list[Draft]:
+def read_drafts(value: str, strict: bool, kind: str = "challenge") -> list[Draft]:
+    """Group the items of each line into drafts; `kind` is "challenge" or "credentials"."""
     drafts: list[Draft] = []
-    for line in line_items(value, strict):
+    for line in line_items(value, strict, kind):
         start = len(drafts)  # a challenge never continues on the next line
         for item in line:
-            _step(drafts, start, item, strict)
+            _step(drafts, start, item, strict, kind)
     return drafts
 
 

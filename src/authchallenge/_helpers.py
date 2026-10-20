@@ -62,10 +62,16 @@ def select_challenge(challenges: Iterable[Challenge], *schemes: str) -> Challeng
     >>> select_challenge(offered, "digest") is None
     True
     """
-    offered = list(challenges)
+    try:
+        offered = list(challenges)
+    except TypeError:
+        raise TypeError(
+            f"challenges must be an iterable of Challenge, not {type(challenges).__name__}"
+        ) from None
     for challenge in offered:
         if not isinstance(challenge, Challenge):
             raise TypeError(f"expected Challenge objects, not {type(challenge).__name__}")
+        need_str(challenge.scheme, "the scheme of each challenge")
     for wanted in schemes:
         need_str(wanted, "each scheme")
         for challenge in offered:

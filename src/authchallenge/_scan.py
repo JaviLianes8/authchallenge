@@ -37,6 +37,7 @@ class Item:
     open: bool = False
     error: str = ""
     error_at: int = 0
+    quiet: str = ""  # the error without input text, for credentials, which carry secrets
 
 
 def fail(reason: str, offset: int) -> AuthError:
@@ -92,6 +93,7 @@ def _read_param(item: Item, text: str, offset: int) -> bool:
     rest = text[match.end() :]
     if rest:
         item.error = f"unexpected text after the value of {shown(param.name)}"
+        item.quiet = "unexpected text after the value of an auth-param"
         item.error_at = offset + len(text) - len(rest.lstrip(" \t"))
         if not param.quoted and rest[0] not in " \t":
             item.param = None  # a token cut short by a stray character is not the value
@@ -117,7 +119,8 @@ def classify(offset: int, raw: str, strict: bool) -> Item:
     gap = raw.lstrip(" \t")[scheme.end() :]
     rest = after.lstrip(" \t")
     space = gap[: len(gap) - len(gap.lstrip(" \t"))]
-    item.open = space != ""  # strict mode refuses a tab in it below
+    # RFC 9110 section 11.3: 1*SP opens the params; a tab alone ends the challenge.
+    item.open = space.startswith(" ")
     if space == "" and after:
         item.error, item.error_at = "expected a space after the auth-scheme", at + scheme.end()
         return item

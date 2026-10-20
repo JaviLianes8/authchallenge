@@ -19,7 +19,7 @@ def _codec(charset: str) -> str:
     # RFC 7617 needs an encoding that maps US-ASCII to single octets: UTF-8 or ISO-8859-1.
     try:
         name = codecs.lookup(need_str(charset, "charset")).name
-    except LookupError:
+    except (LookupError, ValueError):  # ValueError: a name with NUL in it
         name = ""
     if name not in ("utf-8", "iso8859-1"):
         raise AuthError(f"unsupported Basic charset {shown(charset)}: use 'utf-8' or 'latin-1'")
@@ -36,14 +36,20 @@ def split_user_pass(token68: str, charset: str) -> tuple[str, str]:
     padding = len(token68) - len(token68.rstrip("="))
     if len(token68) % 4 or padding > 2:
         raise AuthError("Basic credentials are not valid base64")
+    # The Unicode and base64 errors hold the credentials, so none is chained or kept as
+    # the context of the AuthError: tracebacks and loggers print both.
+    codec = _codec(charset)
     try:
-        raw = base64.b64decode(token68, validate=True)
-    except (binascii.Error, ValueError) as error:
-        raise AuthError("Basic credentials are not valid base64") from error
-    try:
-        text = raw.decode(_codec(charset))
-    except UnicodeDecodeError as error:
-        raise AuthError(f"Basic credentials are not valid {charset}") from error
+        text: str | None = base64.b64decode(token68, validate=True).decode(codec)
+        valid = True
+    except UnicodeDecodeError:
+        text, valid = None, True
+    except (binascii.Error, ValueError):
+        text, valid = None, False
+    if not valid:
+        raise AuthError("Basic credentials are not valid base64")
+    if text is None:
+        raise AuthError(f"Basic credentials are not valid {charset}")
     user_id, colon, password = text.partition(":")
     if not colon:
         raise AuthError("Basic credentials lack the ':' between user-id and password")
@@ -72,10 +78,13 @@ def encode_basic(user_id: str, password: str, *, charset: str = "utf-8") -> str:
         raise AuthError("a Basic user-id cannot contain ':'")
     if _has_control(user_id) or _has_control(password):
         raise AuthError("Basic user-id and password must not contain control characters")
+    codec = _codec(charset)
     try:
-        raw = f"{user_id}:{password}".encode(_codec(charset))
-    except UnicodeEncodeError as error:
-        raise AuthError(f"the credentials cannot be encoded as {charset}") from error
+        raw: bytes | None = f"{user_id}:{password}".encode(codec)
+    except UnicodeEncodeError:
+        raw = None  # raised below, outside the handler, so the password is not its context
+    if raw is None:
+        raise AuthError(f"the credentials cannot be encoded as {charset}")
     return "Basic " + base64.b64encode(raw).decode("ascii")
 
 
@@ -99,9 +108,12 @@ def decode_basic(credentials: str | Credentials, *, charset: str = "utf-8") -> t
             # Without a space the text may be a bare token68, so it is never quoted.
             raise AuthError("not Basic credentials: the value lacks the 'Basic' scheme")
     elif isinstance(credentials, Credentials):
-        scheme, token68 = need_str(credentials.scheme, "scheme"), credentials.token68 or ""
+        scheme = need_str(credentials.scheme, "scheme")
+        token68 = "" if credentials.token68 is None else need_str(credentials.token68, "token68")
     else:
         raise TypeError(f"expected a str or Credentials, not {type(credentials).__name__}")
     if scheme.lower() != "basic":
-        raise AuthError(f"not Basic credentials: {shown(scheme)}")
+        # Read from a str, the would-be scheme may be the base64 itself: never quote it.
+        named = shown(scheme) if isinstance(credentials, Credentials) else "the scheme is not Basic"
+        raise AuthError(f"not Basic credentials: {named}")
     return split_user_pass(token68, charset)

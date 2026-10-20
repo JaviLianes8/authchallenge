@@ -129,8 +129,10 @@ part has a control character, and the charset is UTF-8 (the default, what a serv
 for with `charset="UTF-8"`) or latin-1. `decode_basic` takes the field value or parsed
 `Credentials`; the password is everything after the first colon.
 
-`encode_ext_value` writes `UTF-8''` and percent-encoded UTF-8; `decode_ext_value` reads
-UTF-8 and ISO-8859-1 ext-values and refuses text that decodes to control characters.
+`encode_ext_value` writes `UTF-8''` and percent-encoded UTF-8, and refuses text with
+control characters (C0, DEL, C1), so whatever it writes reads back. `decode_ext_value`
+reads UTF-8 and ISO-8859-1 ext-values, checks that the language, when given, is an RFC
+5646 language tag, and refuses text that decodes to control characters.
 
 ```python
 from authchallenge import AuthError, decode_basic, decode_ext_value, encode_basic
@@ -157,8 +159,9 @@ in your list that the server offered, comparing schemes without case, or `None`.
 
 ## Errors
 
-`AuthError` is a `ValueError`. Its message quotes at most 40 characters of the input and
-never a token68. Arguments of the wrong type raise `TypeError` naming the argument.
+`AuthError` is a `ValueError`. Its message quotes at most 40 characters of the input,
+never a token68 and no other text of credentials, and it chains no exception that holds
+the input. Arguments of the wrong type raise `TypeError` naming the argument.
 
 ```python
 from authchallenge import AuthError, build_challenge, decode_basic
@@ -179,4 +182,5 @@ come as arguments, one per stdin line, or as a header dump on stdin such as `cur
 output, of which only the authentication fields are read; the first non-empty line
 decides which. `--authorization` and `--info` read the values as credentials or
 Authentication-Info. `--strict` reports the first broken rule of each value on stderr
-and exits 1.
+and exits 1. Stdin is read as octets decoded as latin-1, like any received field value,
+and only LF (with an optional CR before it) ends a line.

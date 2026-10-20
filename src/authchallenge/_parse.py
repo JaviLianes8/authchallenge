@@ -53,7 +53,7 @@ def parse_authorization(value: str, *, strict: bool = False) -> Credentials:
     >>> parse_authorization("Bearer mF_9.B5f-4.1JqM").token68
     'mF_9.B5f-4.1JqM'
     """
-    drafts = read_drafts(need_str(value, "the Authorization value"), strict)
+    drafts = read_drafts(need_str(value, "the Authorization value"), strict, "credentials")
     if strict:
         if not drafts or value.strip(" \t")[: len(drafts[0].scheme)] != drafts[0].scheme:
             raise AuthError("the field must start with an auth-scheme")
