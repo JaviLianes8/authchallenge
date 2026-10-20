@@ -57,6 +57,10 @@ def parse_authorization(value: str, *, strict: bool = False) -> Credentials:
     if strict:
         if not drafts or value.strip(" \t")[: len(drafts[0].scheme)] != drafts[0].scheme:
             raise AuthError("the field must start with an auth-scheme")
+        scheme_end = drafts[0].offset + len(drafts[0].scheme)
+        if value.rstrip(" \t")[scheme_end : scheme_end + 1] not in ("", " "):
+            # Credentials are one element, not a list: "Basic," is not allowed.
+            raise fail("expected a space after the auth-scheme", scheme_end)
         if len(drafts) > 1:
             raise fail("only one credentials is allowed", drafts[1].offset)
         token68 = drafts[0].token68
