@@ -242,3 +242,23 @@ message; 25daa85 pins the new one. At 25daa85 `ruff format --check .`, `ruff che
 `mypy --strict src`, `mypy --strict src tests` and `pytest` exit 0 (539 tests collected, 11
 skipped: the opt-in e2e, the 0.2.0 oracle, and the live oracles whose tools are not installed
 there).
+
+### Round 3 (at c5de815)
+
+Lens e reported two gaps in the contracts (no behaviour bug); both were accepted and fixed,
+none is disputed. The library code and the public behaviour are unchanged, so the CHANGELOG
+is unchanged. Fixed in e3a10f8 (`tests/test_qa_round3.py`).
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| e F1 | Nothing checked the exception chain of the Digest `username*` error: without `from None` the printed traceback of `build_authorization` showed the inner ext-value error quoting the user name | The full printed traceback (`traceback.format_exception`) of `build_authorization` with two bad `username*` values and of strict `parse_authorization` is checked: the message, `__suppress_context__` and no user name |
+| e F2 | The `TypeError` of `parse_challenges`, `parse_auth_info` and `select_challenge` for a non-iterable argument was not pinned: quoting the argument or dropping `from None` stayed green | With `7**300` the exact messages `expected a str or an iterable of str, not int` and `challenges must be an iterable of Challenge, not int` are pinned, with `__suppress_context__` and no digits of the number in the printed traceback |
+
+Mutants run against the new contracts, each applied alone on this PC (all killed): the
+`username*` re-raise without `from None`; the `each_line` type error without `from None`; the
+`each_line` type error quoting `value!r`; the `select_challenge` type error without
+`from None`; the `select_challenge` type error quoting `challenges!r`.
+
+Gates on Elena's PC (CPython 3.14.2, a copy of the tree with the new tests): `ruff format
+--check .`, `ruff check .`, `mypy --strict src` and `pytest` exit 0; `mypy --strict src tests`
+exits 0 on this PC.
