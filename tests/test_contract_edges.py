@@ -60,7 +60,7 @@ def test_a_backslash_outside_a_quoted_string_escapes_nothing() -> None:
     ["QWxhZGRpbjpvcGVu=", "dTpw=", "dTpw==", "dTpw===", "dTpw====", "dTo====", "dTo==", "dTpwcQ="],
 )
 def test_basic_refuses_surplus_or_short_padding_on_every_python(token: str) -> None:
-    # CPython 3.10 to 3.12 decode surplus padding even with validate=True; 3.13 does not.
+    # Some CPython 3.10 and 3.11 releases decode surplus padding with validate=True.
     with pytest.raises(ac.AuthError, match="not valid base64"):
         ac.decode_basic("Basic " + token)
 

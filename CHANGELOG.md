@@ -38,9 +38,10 @@ tolerant and strict parsing will only change in a new major version.
   as `Basic,` or a tab followed by more text: credentials are one element, not a list,
   so the empty list elements a challenge may hold do not apply. 0.2.0 accepted them.
 - `decode_basic` (and strict Basic credentials) refuse base64 whose length is not a
-  multiple of four or that ends in more than two `=`, on every Python. On CPython 3.10 to
-  3.12, 0.2.0 decoded `Basic QWxhZGRpbjpvcGVu=` or `Basic dTpw====` because those
-  versions accept surplus padding; 3.13 and later already refused them.
+  multiple of four or that ends in more than two `=`, on every Python. Some CPython 3.10
+  and 3.11 releases accept surplus padding, so there 0.2.0 decoded
+  `Basic QWxhZGRpbjpvcGVu=` (3.10.19, 3.11.5) or `Basic dTpw====` (3.11.5, 3.11.17);
+  3.12 and later already refused them.
 
 ### Added
 

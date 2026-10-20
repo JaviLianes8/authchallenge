@@ -7,6 +7,7 @@ otherwise. Results are compared by value and errors by family (AuthError or not)
 
 from __future__ import annotations
 
+import base64
 import importlib.util
 import os
 import random
@@ -66,13 +67,21 @@ def _no_space_after_scheme(text: str) -> bool:
     return match is not None and head[match.end() : match.end() + 1] not in ("", " ")
 
 
+def _base64_accepts(token: str) -> bool:
+    try:
+        base64.b64decode(token, validate=True)
+    except ValueError:
+        return False
+    return True
+
+
 def _padding_fix(before: Any, after: Any, text: str) -> bool:
-    """The documented Basic fix: surplus padding that CPython before 3.13 decoded."""
+    """The documented Basic fix: surplus padding this Python's base64 module decodes."""
     token = text.strip(" 	").split(" ")[-1]
     padding = len(token) - len(token.rstrip("="))
     surplus = len(token) % 4 != 0 or padding > 2
     accepted = before is not None and before not in (("error", True), ("error", False))
-    lenient = sys.version_info < (3, 13) and accepted
+    lenient = accepted and _base64_accepts(token)
     return lenient and surplus and after == ("error", True)
 
 
@@ -142,5 +151,8 @@ def test_documented_changes_against_0_2_0(old: ModuleType) -> None:
     assert "QWxh" not in repr(ac.parse_authorization("Basic QWxh"))
     with pytest.raises(ac.AuthError, match="not valid base64"):
         ac.decode_basic("Basic dTpw====")
-    if sys.version_info < (3, 13):
-        assert old.decode_basic("Basic dTpw====") == ("u", "p")
+    for token in ("dTpw====", "QWxhZGRpbjpvcGVu="):
+        with pytest.raises(ac.AuthError, match="not valid base64"):
+            ac.decode_basic("Basic " + token)
+        if _base64_accepts(token):  # some CPython 3.10 and 3.11 releases
+            assert old.decode_basic("Basic " + token)[0] in ("u", "Aladdin")

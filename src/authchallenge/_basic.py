@@ -31,7 +31,7 @@ def split_user_pass(token68: str, charset: str) -> tuple[str, str]:
     # The token68 carries the password: no message ever quotes it.
     if not is_token68(token68):
         raise AuthError("invalid token68: Basic credentials are base64 after the scheme")
-    # Python before 3.13 decodes surplus padding ("QQ===", "QWxh=") with validate=True;
+    # Some CPython 3.10 and 3.11 releases decode surplus padding with validate=True;
     # checking the length first gives the same answer on every version.
     padding = len(token68) - len(token68.rstrip("="))
     if len(token68) % 4 or padding > 2:
