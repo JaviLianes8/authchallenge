@@ -53,3 +53,20 @@ def test_a_backslash_outside_a_quoted_string_escapes_nothing() -> None:
     assert ac.parse_auth_info(r"a=1, b\, c=2") == {"a": "1", "c": "2"}
     with pytest.raises(ac.AuthError, match="unexpected text after the value of 'a'"):
         ac.parse_challenges(r"X a=b\, c=d", strict=True)
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["QWxhZGRpbjpvcGVu=", "dTpw=", "dTpw==", "dTpw===", "dTpw====", "dTo====", "dTo==", "dTpwcQ="],
+)
+def test_basic_refuses_surplus_or_short_padding_on_every_python(token: str) -> None:
+    # CPython 3.10 to 3.12 decode surplus padding even with validate=True; 3.13 does not.
+    with pytest.raises(ac.AuthError, match="not valid base64"):
+        ac.decode_basic("Basic " + token)
+
+
+@pytest.mark.parametrize("token", ["dTpw", "dTo=", "dTpwcQ==", "dTpwcXI="])
+def test_basic_accepts_canonical_padding(token: str) -> None:
+    assert ac.decode_basic("Basic " + token) == tuple(
+        base64.b64decode(token).decode().split(":", 1)
+    )

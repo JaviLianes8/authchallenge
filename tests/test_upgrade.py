@@ -66,6 +66,16 @@ def _no_space_after_scheme(text: str) -> bool:
     return match is not None and head[match.end() : match.end() + 1] not in ("", " ")
 
 
+def _padding_fix(before: Any, after: Any, text: str) -> bool:
+    """The documented Basic fix: surplus padding that CPython before 3.13 decoded."""
+    token = text.strip(" 	").split(" ")[-1]
+    padding = len(token) - len(token.rstrip("="))
+    surplus = len(token) % 4 != 0 or padding > 2
+    accepted = before is not None and before not in (("error", True), ("error", False))
+    lenient = sys.version_info < (3, 13) and accepted
+    return lenient and surplus and after == ("error", True)
+
+
 @pytest.mark.parametrize("seed", [7, 8])
 def test_parsers_answer_as_0_2_0(old: ModuleType, seed: int) -> None:
     rng = random.Random(seed)
@@ -80,7 +90,7 @@ def test_parsers_answer_as_0_2_0(old: ModuleType, seed: int) -> None:
             after = _outcome(ac, "parse_authorization", text, strict=strict)
             if strict and _no_space_after_scheme(text) and before != after:
                 assert after == ("error", True), text
-            else:
+            elif not _padding_fix(before, after, text):
                 assert before == after, text
 
 
@@ -107,7 +117,9 @@ def test_builders_and_codecs_answer_as_0_2_0(old: ModuleType, seed: int) -> None
             ("encode_ext_value", (text,)),
             ("encode_basic", (text.replace(":", ""), text)),
         ):
-            assert _outcome(old, name, *args) == _outcome(ac, name, *args), (name, args)
+            before, after = _outcome(old, name, *args), _outcome(ac, name, *args)
+            if not (name == "decode_basic" and _padding_fix(before, after, args[0])):
+                assert before == after, (name, args)
 
 
 def test_documented_changes_against_0_2_0(old: ModuleType) -> None:
@@ -128,3 +140,7 @@ def test_documented_changes_against_0_2_0(old: ModuleType) -> None:
         old.encode_ext_value("\ud800")
     assert "QWxh" in repr(old.parse_authorization("Basic QWxh"))
     assert "QWxh" not in repr(ac.parse_authorization("Basic QWxh"))
+    with pytest.raises(ac.AuthError, match="not valid base64"):
+        ac.decode_basic("Basic dTpw====")
+    if sys.version_info < (3, 13):
+        assert old.decode_basic("Basic dTpw====") == ("u", "p")
