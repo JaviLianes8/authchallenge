@@ -48,8 +48,8 @@ def test_basic_charsets_are_utf_8_and_latin_1_only(charset: str) -> None:
 
 
 def test_a_backslash_outside_a_quoted_string_escapes_nothing() -> None:
-    (challenge,) = ac.parse_challenges("X a=b\, c=d")
+    (challenge,) = ac.parse_challenges(r"X a=b\, c=d")
     assert challenge.params == {"c": "d"}
-    assert ac.parse_auth_info("a=1, b\, c=2") == {"a": "1", "c": "2"}
+    assert ac.parse_auth_info(r"a=1, b\, c=2") == {"a": "1", "c": "2"}
     with pytest.raises(ac.AuthError, match="unexpected text after the value of 'a'"):
-        ac.parse_challenges("X a=b\, c=d", strict=True)
+        ac.parse_challenges(r"X a=b\, c=d", strict=True)

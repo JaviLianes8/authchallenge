@@ -104,10 +104,9 @@ from authchallenge import (
 )
 
 print(build_challenge("Newauth", {"realm": "apps", "type": "1", "title": "Login Page"}))
-print(build_authorization("Digest", {
-    "username*": encode_ext_value("Jäsøn Doe"), "realm": "api", "nonce": "n1",
-    "uri": "/", "response": "8ca5", "cnonce": "c1", "nc": "00000001", "qop": "auth",
-}))
+user = encode_ext_value("Jäsøn Doe")
+fields = {"username*": user, "realm": "api", "nonce": "n1", "uri": "/", "response": "8ca5"}
+print(build_authorization("Digest", {**fields, "cnonce": "c1", "nc": "00000001", "qop": "auth"}))
 for scheme, params in (("Basic", {}), ("Digest", {"realm": "a", "nc": "1"})):
     try:
         build_challenge(scheme, params)
