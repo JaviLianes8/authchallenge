@@ -32,9 +32,19 @@ tolerant and strict parsing will only change in a new major version.
 - `build_challenge` and `build_authorization` with `params=[]` (or another empty value
   that is not a mapping) raise `TypeError` instead of building a bare scheme.
 
+### Fixed
+
+- Strict `parse_authorization` refuses anything but a space right after the scheme, such
+  as `Basic,` or a tab followed by more text: credentials are one element, not a list,
+  so the empty list elements a challenge may hold do not apply. 0.2.0 accepted them.
+
 ### Added
 
-- Runnable examples in every public docstring, run as doctests.
+- Runnable examples in every public docstring, run as doctests, and a GUIDE whose
+  examples run as tests.
+- Contracts: pinned signatures, seeded property tests against a recognizer written from
+  the RFC 9110 grammar, linear time on hostile input, curl, httpx, requests, werkzeug and
+  urllib as live oracles, the RFC 8187 text, and PyPI 0.2.0 as an oracle for upgrades.
 
 ## [0.2.0] - 2026-10-19
 

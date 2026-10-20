@@ -108,9 +108,7 @@ def test_urllib_digest_handler_answers_our_challenge() -> None:
     header = "Digest " + str(
         handler.get_authorization(request, ac.parse_challenges(built)[0].params)
     )
-    try:
+    # urllib writes algorithm="MD5", which RFC 7616 section 3.4 tells senders not to quote.
+    with pytest.raises(ac.AuthError, match="algorithm parameter must not be quoted"):
         check_digest_credentials(header, algorithm="MD5")
-    except ac.AuthError as error:
-        # urllib quotes algorithm, as requests does.
-        assert "algorithm parameter must not be quoted" in str(error)
-        check_digest_credentials(header, algorithm="MD5", strict=False)
+    check_digest_credentials(header, algorithm="MD5", strict=False)
