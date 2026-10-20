@@ -170,3 +170,46 @@ module whether 0.2.0 could have accepted a token.
 At 23b8908 from a fresh clone on Elena's PC, each command on its own: `ruff format --check .`,
 `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` (as above)
 exit 0.
+
+## QA lenses (item 19)
+
+Five independent lenses: a (API and docs), b (correctness and ground truth), c
+(adversarial and robustness), d (packaging and real e2e), e (contract strength).
+
+### Round 1 (at aa61317)
+
+Every finding was accepted and fixed; none is disputed. Each behaviour bug first got a
+contract that failed on aa61317, then the fix. Fixed in d0d77ef.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| a F1 | `encode_ext_value` encoded controls that `decode_ext_value` refuses | It raises `AuthError` for C0, DEL and C1; a seeded property test checks `decode(encode(s)) == s` for every accepted text |
+| a F2, c F6 | `select_challenge(None, ...)`, a `Challenge` with a non-`str` scheme and `Credentials` with a non-`str` token68 leaked bare `TypeError` or `AttributeError` | `TypeError` naming the argument |
+| a F3 | The CHANGELOG said 0.2.0 accepted `Basic,` and a tab after Basic | Reworded after running PyPI 0.2.0: the change is for schemes without rules of their own (`Newauth,`, `Newauth\t ,`) |
+| a F4 | The `AuthError` docstring promised an offset for all strict errors | Aligned with the GUIDE: the offset is given for grammar errors |
+| a F5 | Strict credentials errors said "outside a challenge" | They say "outside the credentials" |
+| a F6 | The 0.1.0 CHANGELOG section had no date | Dated 2026-10-11 (commit df66c3f), marked as not published on PyPI |
+| b F1 | Strict challenges took params after `scheme<TAB>,` | Only a space opens the params (RFC 9110 section 11.3). `Newauth\t, x=1` was a regression of this branch (0.2.0 refused it); `Newauth\t ,x=1` was accepted by 0.2.0 and is in the CHANGELOG |
+| b F2 | The ext-value language was any `[A-Za-z0-9-]*` | Checked against the RFC 5646 section 2.1 Language-Tag grammar (langtag, privateuse, grandfathered); linear on 80,000 subtags |
+| c F1 | The CLI joined folded lines in quadratic time | Continuation lines are collected and joined once; a ratio test pins linear time |
+| c F2 | Basic errors chained a `UnicodeError` holding `user:password` | The error is raised outside the handler: no cause, no context but our own `AuthError` |
+| c F3 | A charset with NUL raised `ValueError` | `AuthError` |
+| c F4 | `decode_basic` quoted a would-be scheme swallowing the base64; strict credentials quoted param names cut from a token68 | No quote of the scheme read from a `str`; credentials errors quote no param name |
+| c F5, d F1 | The CLI split on every Unicode line break and decoded stdin with the locale codec | Stdin is read as octets decoded as latin-1; only LF (with an optional CR) ends a line |
+| e F1 | No test of the CLI field mapping | A dump with all six field names checks each kind |
+| e F2 | No secret test on the base64 decode failure branch | Three calls added to `SECRET_CALLS` |
+| e F3, e F4 | Digest quoting checked only with the fetched RFC text | `tests/test_digest_quoting.py` always runs, with the lists written by hand from RFC 7616 sections 3.3 to 3.5, building and refusing the wrong quoting of each name |
+
+Mutants run against the new contracts, each applied alone (all killed): the Proxy-Authorization
+kind set to challenges; the token68 added to the base64 error; `opaque` dropped from the
+quoted challenge list; `nc` dropped from the bare credentials list; the params opened by any
+whitespace; the language check skipped; `ValueError` no longer caught for the charset; stdin
+decoded as UTF-8; credentials errors quoting the param name.
+
+PyPI 0.2.0 as an oracle (`tests/test_upgrade.py`) lists the new changes: control characters in
+`encode_ext_value`, a bad ext-value language, the tab before the comma and the NUL charset.
+
+Gates at d0d77ef, from a fresh clone on Elena's PC (CPython 3.14.2, the fetched sources and the
+0.2.0 oracle present): `ruff format --check .`, `ruff check .`, `mypy --strict src`,
+`mypy --strict src tests` and `pytest` exit 0 (501 passed, 8 skipped: the opt-in e2e and the
+live oracles whose tools are not installed there).
