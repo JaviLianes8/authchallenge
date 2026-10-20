@@ -102,7 +102,11 @@ def _digest_credentials(found: dict[str, Param]) -> None:
     if "username*" in found:
         if found["username*"].quoted:
             raise AuthError("the Digest username* parameter is an ext-value, not quoted")
-        decode_ext_value(found["username*"].value)
+        try:
+            decode_ext_value(found["username*"].value)
+        except AuthError:
+            # Its message quotes the value, a user name the credentials keep to themselves.
+            raise AuthError("the Digest username* parameter is not a valid ext-value") from None
     _require("Digest", found, ["realm", "nonce", "uri", "response", "cnonce", "nc"])
 
 

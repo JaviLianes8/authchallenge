@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "authchallenge"
-version = "0.2.0"
+version = "1.0.0"
 description = "Parse, validate and safely build HTTP WWW-Authenticate, Authorization and Authentication-Info headers per RFC 9110, typed and zero-dependency"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
 keywords = ["http", "authentication", "www-authenticate", "authorization", "proxy-authenticate", "authentication-info", "basic", "digest", "bearer", "rfc9110", "rfc7235", "rfc7617", "rfc7616", "rfc6750"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -32,14 +32,14 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest", "build", "twine"]
+dev = ["ruff", "mypy", "pytest", "pytest-timeout", "build", "twine"]
 
 [project.scripts]
 authchallenge = "authchallenge._cli:main"
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
-Repository = "https://github.com/JaviLianes8/authchallenge"
+Source = "https://github.com/JaviLianes8/authchallenge"
 Issues = "https://github.com/JaviLianes8/authchallenge/issues"
 Changelog = "https://github.com/JaviLianes8/authchallenge/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
@@ -53,6 +53,7 @@ packages = ["src/authchallenge"]
 exclude = [
     ".github",
     "IMPROVEMENTS-round*.md",
+    "CERT-1.0-*.md",
     "tests/upstream/*.txt",
     "tests/upstream/*.html",
 ]
@@ -69,6 +70,7 @@ python_version = "3.10"
 strict = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-addopts = "-q"
+testpaths = ["src", "tests"]
+pythonpath = ["src", "tests"]
+addopts = "-q --doctest-modules"
+timeout = 300

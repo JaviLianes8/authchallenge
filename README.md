@@ -1,5 +1,7 @@
 # authchallenge
 
+[![Lianes8 Certified](https://lianes8studio.com/certified/lianes8-certified-badge.svg)](https://lianes8studio.com/certified)
+
 Parse and build HTTP authentication headers: `WWW-Authenticate`, `Proxy-Authenticate`,
 `Authorization`, `Proxy-Authorization` and `Authentication-Info`, per RFC 9110 with the
 rules of Basic (RFC 7617), Digest (RFC 7616) and Bearer (RFC 6750). Typed, zero
@@ -115,7 +117,8 @@ authchallenge --authorization 'Bearer mF_9.B5f-4.1JqM'
 ```
 
 Values come as arguments or one per stdin line; a header dump on stdin is read for the
-authentication fields only (the first non-empty line decides which). The output is JSON.
+authentication fields only (the first non-empty line decides which). Stdin is decoded as
+latin-1, like any received field value. The output is JSON.
 `--strict` reports the first broken rule of each value on stderr and exits 1.
 
 ## API
@@ -133,8 +136,12 @@ authentication fields only (the first non-empty line decides which). The output 
 | `decode_basic(credentials, *, charset="utf-8")` | `(user_id, password)` |
 | `encode_ext_value(text)` / `decode_ext_value(value)` | RFC 8187 ext-values such as `username*` |
 | `select_challenge(challenges, *schemes)` | The first challenge of the most preferred scheme |
-| `Challenge`, `Credentials` | Frozen results: `scheme`, `token68`, `params` (names lower-cased) |
-| `AuthError` | A `ValueError` raised by builders and strict parsing |
+| `Challenge`, `Credentials` | Frozen results: `scheme`, `token68`, `params` (names lower-cased); the `repr` of `Credentials` hides the token68 |
+| `AuthError` | A `ValueError` raised by builders, codecs and strict parsing; its message quotes at most 40 characters of input and never a token68 |
+
+Arguments of the wrong type (bytes instead of `str`, a list instead of a mapping) raise
+`TypeError`. The API is stable from 1.0.0: names, parameters, defaults and error types
+change only in a new major version.
 
 Strict mode and the builders check the grammar of RFC 9110 section 11 and these scheme
 rules: Basic needs a realm and allows only `charset="UTF-8"`, and its credentials must
@@ -148,10 +155,13 @@ and the response params in credentials, writes `nc` as 8 hex digits, and takes o
 
 Authentication headers are deceptively hard: one comma separates both the params within a
 challenge and the challenges from each other, token68 and auth-params look alike, the
-field may be repeated, and each scheme adds quoting rules of its own. The existing options
-fall short: `authparser` pulls in `pyparsing`, `www-authenticate` has been unmaintained
-since 2015 and only parses, and the newer `wwwauth` parses WWW-Authenticate alone. This
-library parses and builds all five fields, validates them on request, refuses header
+field may be repeated, and each scheme adds quoting rules of its own. What exists on PyPI
+covers part of it: `authparser` depends on `pyparsing`, `www-authenticate` had its last
+release in 2015, and `wwwauth` parses WWW-Authenticate only. HTTP clients and frameworks
+read a challenge only to answer it, and what they write does not always follow RFC 7616:
+`requests` and the standard library's urllib quote the Digest `algorithm`, and werkzeug
+writes `realm` without quotes. This library parses and builds all five fields, validates
+them on request against RFC 9110 and the Basic, Digest and Bearer rules, refuses header
 injection when building, and ships typed with no dependencies.
 
 ## Testing against the specifications
@@ -161,9 +171,16 @@ test cases listed in `tests/upstream/MANIFEST.json`, checking each against its s
 The suite then reads character sets, quoting lists and examples from them and runs every
 test case in both modes; without them those tests skip.
 
+## Documentation
+
+The [GUIDE](https://github.com/JaviLianes8/authchallenge/blob/main/GUIDE.md) describes
+every public name, both parsing modes and the rules strict mode checks; the
+[CHANGELOG](https://github.com/JaviLianes8/authchallenge/blob/main/CHANGELOG.md) lists
+what changed in each release.
+
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/authchallenge/blob/main/LICENSE).
 
 ## Links
 

@@ -27,21 +27,31 @@ def _fields(text: str, default: str) -> list[tuple[str, str]]:
     """Return (field name, value) pairs from a header dump, or one per plain line.
 
     The first non-empty line decides: a status line or a `Name: value` line makes the
-    whole input a header dump, of which only the authentication fields are read.
+    whole input a header dump, of which only the authentication fields are read. Only
+    LF ends a line (with an optional CR before it), as in HTTP/1.1.
     """
-    lines = [line.rstrip("\r") for line in text.splitlines()]
-    first = next((line for line in lines if line.strip()), "")
+    lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+    first = next((line for line in lines if line.strip(" \t")), "")
     dump = first.startswith("HTTP/") or _FIELD_LINE.fullmatch(first) is not None
     if not dump:
-        return [(default, line.strip()) for line in lines if line.strip()]
-    pairs: list[tuple[str, str]] = []
+        return [(default, line.strip(" \t")) for line in lines if line.strip(" \t")]
+    fields: list[tuple[str, list[str]]] = []
     for line in lines:
         match = _FIELD_LINE.fullmatch(line)
         if match is not None:
-            pairs.append((match.group(1), match.group(2)))
-        elif line[:1] in (" ", "\t") and pairs:
-            pairs[-1] = (pairs[-1][0], pairs[-1][1] + "\r\n" + line)
-    return [(name, value) for name, value in pairs if name.lower() in _KINDS]
+            fields.append((match.group(1), [match.group(2)]))
+        elif line[:1] in (" ", "\t") and fields:
+            fields[-1][1].append(line)  # obs-fold, joined once below
+    return [(name, "\r\n".join(parts)) for name, parts in fields if name.lower() in _KINDS]
+
+
+def _stdin() -> str:
+    """Read stdin as octets decoded as latin-1, the way field values are received."""
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:  # a text stream without octets underneath, such as io.StringIO
+        return sys.stdin.read()
+    data: bytes = buffer.read()
+    return data.decode("latin-1")
 
 
 def _plain(found: Challenge | Credentials) -> dict[str, Any]:
@@ -83,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.values:
         fields = [(default, value) for value in args.values]
     else:
-        fields = _fields(sys.stdin.read(), default)
+        fields = _fields(_stdin(), default)
     if not fields:
         parser.error("no field values given")
     report = [_report(name, value, args.strict) for name, value in fields]

@@ -1,4 +1,9 @@
-"""Parse and build HTTP authentication headers: challenges, credentials, Authentication-Info."""
+"""Parse and build HTTP authentication headers: challenges, credentials, Authentication-Info.
+
+>>> import authchallenge
+>>> authchallenge.parse_challenges('Basic realm="api"')[0].params
+{'realm': 'api'}
+"""
 
 from __future__ import annotations
 
@@ -9,7 +14,7 @@ from ._helpers import build_bearer_challenge, select_challenge
 from ._model import AuthError, Challenge, Credentials
 from ._parse import parse_auth_info, parse_authorization, parse_challenges
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "AuthError",
@@ -28,3 +33,9 @@ __all__ = [
     "parse_challenges",
     "select_challenge",
 ]
+
+# The public classes report the package as their home, so pickles and reprs of types
+# never depend on the private module layout.
+for _public in (AuthError, Challenge, Credentials):
+    _public.__module__ = __name__
+del _public

@@ -2,101 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
-from typing import TypeVar
+from collections.abc import Iterable
 
+from ._drafts import add_param, checked, each_line, line_items, read_drafts
+from ._grammar import need_str, shown
 from ._model import AuthError, Challenge, Credentials
-from ._scan import Item, Param, classify, fail, prepare, split
+from ._scan import Param, fail
 from ._schemes import check
-
-_T = TypeVar("_T")
-
-
-@dataclass
-class _Draft:
-    scheme: str
-    offset: int
-    token68: str | None
-    open: bool
-    params: dict[str, Param] = field(default_factory=dict)
-
-    def values(self) -> dict[str, str]:
-        return {name: param.value for name, param in self.params.items()}
-
-
-def _items(value: str, strict: bool) -> list[list[Item]]:
-    """Items of each line. Strict mode refuses line breaks; tolerant mode reads a bare one
-    (not obs-fold) as the end of a field line, so the next line keeps its challenges."""
-    text = prepare(value, strict)
-    lines = [text] if strict else text.replace("\r\n", "\n").split("\n")
-    result: list[list[Item]] = []
-    for line in lines:
-        parts, open_quote = split(line)
-        if strict and open_quote is not None:
-            raise fail("unterminated quoted-string", open_quote)
-        items = [classify(offset, raw, strict) for offset, raw in parts]
-        if strict:
-            for item in items:
-                if item.error:
-                    raise fail(item.error, item.error_at)
-        result.append(items)
-    return result
-
-
-def _add(params: dict[str, Param], param: Param, strict: bool) -> None:
-    if param.name in params:
-        if strict:
-            raise fail(f"duplicate auth-param {param.name!r}", param.offset)
-        return  # the first one wins, as most user agents do
-    params[param.name] = param
-
-
-def _step(drafts: list[_Draft], start: int, item: Item, strict: bool) -> None:
-    if item.kind == "challenge":
-        drafts.append(_Draft(item.scheme, item.offset, item.token68, item.open))
-        if item.param is not None:
-            _add(drafts[-1].params, item.param, strict)
-    elif item.kind == "param" and item.param is not None:
-        current = drafts[-1] if len(drafts) > start else None
-        if current is None or current.token68 is not None or not current.open:
-            if strict:
-                raise fail(f"auth-param {item.param.name!r} outside a challenge", item.offset)
-            if current is None or current.token68 is not None:
-                return
-        current.open = True
-        _add(current.params, item.param, strict)
-
-
-def _drafts(value: str, strict: bool) -> list[_Draft]:
-    drafts: list[_Draft] = []
-    for line in _items(value, strict):
-        start = len(drafts)  # a challenge never continues on the next line
-        for item in line:
-            _step(drafts, start, item, strict)
-    return drafts
-
-
-def _checked(draft: _Draft, kind: str, strict: bool) -> _Draft:
-    if strict:
-        try:
-            check(draft.scheme, kind, draft.token68, list(draft.params.values()))
-        except AuthError as error:
-            raise AuthError(f"{error}, in the {kind} at offset {draft.offset}") from None
-    return draft
-
-
-def _each_line(value: str | Iterable[str], read: Callable[[str], _T]) -> list[_T]:
-    lines = [value] if isinstance(value, str) else list(value)
-    results: list[_T] = []
-    for number, line in enumerate(lines, 1):
-        try:
-            results.append(read(line))
-        except AuthError as error:
-            if len(lines) == 1:
-                raise
-            raise AuthError(f"{error} (field line {number})") from None
-    return results
 
 
 def parse_challenges(value: str | Iterable[str], *, strict: bool = False) -> list[Challenge]:
@@ -106,13 +18,23 @@ def parse_challenges(value: str | Iterable[str], *, strict: bool = False) -> lis
     By default parsing is tolerant: malformed parts are skipped and the first of two
     params with the same name wins. With `strict=True` anything RFC 9110, RFC 7617,
     RFC 7616 or RFC 6750 forbids raises `AuthError` with the reason and offset.
+    Field values are `str` (decode received bytes as latin-1); other types raise
+    `TypeError`.
+
+    >>> from authchallenge import parse_challenges
+    >>> for challenge in parse_challenges('Basic realm="simple", Newauth realm="apps", type=1'):
+    ...     print(challenge.scheme, challenge.params)
+    Basic {'realm': 'simple'}
+    Newauth {'realm': 'apps', 'type': '1'}
+    >>> parse_challenges(["Negotiate a87421bff012e83c==", "Basic realm=a"])[0].token68
+    'a87421bff012e83c=='
     """
 
     def read(line: str) -> list[Challenge]:
-        drafts = [_checked(d, "challenge", strict) for d in _drafts(line, strict)]
+        drafts = [checked(d, "challenge", strict) for d in read_drafts(line, strict)]
         return [Challenge(d.scheme, d.token68, d.values()) for d in drafts]
 
-    challenges = [c for found in _each_line(value, read) for c in found]
+    challenges = [c for found in each_line(value, read) for c in found]
     if strict and not challenges:
         raise AuthError("the field holds no challenge")
     return challenges
@@ -123,11 +45,22 @@ def parse_authorization(value: str, *, strict: bool = False) -> Credentials:
 
     Tolerant mode returns the first credentials found, or `Credentials("")` if none.
     Strict mode raises `AuthError` unless the value is exactly one valid credentials.
+
+    >>> from authchallenge import parse_authorization
+    >>> creds = parse_authorization('Digest username="Mufasa", realm="a", nc=00000001')
+    >>> creds.scheme, creds.params["username"], creds.params["nc"]
+    ('Digest', 'Mufasa', '00000001')
+    >>> parse_authorization("Bearer mF_9.B5f-4.1JqM").token68
+    'mF_9.B5f-4.1JqM'
     """
-    drafts = _drafts(value, strict)
+    drafts = read_drafts(need_str(value, "the Authorization value"), strict, "credentials")
     if strict:
         if not drafts or value.strip(" \t")[: len(drafts[0].scheme)] != drafts[0].scheme:
             raise AuthError("the field must start with an auth-scheme")
+        scheme_end = drafts[0].offset + len(drafts[0].scheme)
+        if value.rstrip(" \t")[scheme_end : scheme_end + 1] not in ("", " "):
+            # Credentials are one element, not a list: "Basic," is not allowed.
+            raise fail("expected a space after the auth-scheme", scheme_end)
         if len(drafts) > 1:
             raise fail("only one credentials is allowed", drafts[1].offset)
         token68 = drafts[0].token68
@@ -135,7 +68,7 @@ def parse_authorization(value: str, *, strict: bool = False) -> Credentials:
             raise AuthError("nothing may follow the token68 of credentials")
     if not drafts:
         return Credentials("")
-    draft = _checked(drafts[0], "credentials", strict)
+    draft = checked(drafts[0], "credentials", strict)
     return Credentials(draft.scheme, draft.token68, draft.values())
 
 
@@ -147,21 +80,27 @@ def parse_auth_info(
     Names are lower-cased and the first of two equal names wins. Strict mode refuses
     anything but auth-params and, given the `scheme` of the request's credentials,
     applies its rules (Digest: quoting, `nc`, and rspauth, cnonce and nc with qop).
+
+    >>> from authchallenge import parse_auth_info
+    >>> parse_auth_info('NextNonce="47364c23", qop=auth, nc=00000001')
+    {'nextnonce': '47364c23', 'qop': 'auth', 'nc': '00000001'}
     """
+    if scheme is not None:
+        need_str(scheme, "scheme")
     params: dict[str, Param] = {}
 
     def read(line: str) -> None:
-        for items in _items(line, strict):
+        for items in line_items(line, strict):
             for item in items:
                 if item.kind == "param" and item.param is not None:
-                    _add(params, item.param, strict)
+                    add_param(params, item.param, strict)
                 elif item.kind != "empty" and strict:
                     raise fail("expected an auth-param", item.offset)
 
-    _each_line(value, read)
+    each_line(value, read)
     if strict and scheme is not None:
         try:
             check(scheme, "info", None, list(params.values()))
         except AuthError as error:
-            raise AuthError(f"{error}, in the {scheme} Authentication-Info") from None
+            raise AuthError(f"{error}, in the {shown(scheme)} Authentication-Info") from None
     return {name: param.value for name, param in params.items()}

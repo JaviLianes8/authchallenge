@@ -1,6 +1,7 @@
 """Build the wheel, install it in a throwaway venv and drive the installed package.
 
-Slow and needs the build backend, so it runs only with AUTHCHALLENGE_E2E=1.
+Slow and needs the build backend, so it runs only with AUTHCHALLENGE_E2E=1. With
+AUTHCHALLENGE_E2E_PYPI=1 it also installs 0.2.0 from PyPI and upgrades it in place.
 """
 
 from __future__ import annotations
@@ -59,7 +60,22 @@ for call in (
         assert isinstance(error, ValueError)
     else:
         raise AssertionError("expected AuthError")
+assert "QWxh" not in repr(ac.parse_authorization("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="))
+assert ac.AuthError.__module__ == "authchallenge"
+try:
+    ac.parse_challenges(b"Basic")
+except TypeError:
+    pass
+else:
+    raise AssertionError("expected TypeError")
 print("e2e ok")
+"""
+
+CONSUMER = """
+from authchallenge import Challenge, parse_challenges, select_challenge
+
+chosen: Challenge | None = select_challenge(parse_challenges('Basic realm="a"'), "basic")
+realm: str = chosen.params["realm"] if chosen else ""
 """
 
 
@@ -85,6 +101,7 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     assert "authchallenge = authchallenge._cli:main" in text
     listing = _run(sys.executable, "-m", "tarfile", "-l", sdist).stdout.decode()
     assert "IMPROVEMENTS-round" not in listing and "httpauth.html" not in listing
+    assert "CERT-1.0" not in listing and "GUIDE.md" in listing and "LICENSE" in listing
     assert "tests/upstream/MANIFEST.json" in listing
     assert ".txt" not in listing.replace("requirements-dev.txt", "")
     assert "tests/test_greenbytes.py" in listing and "scripts/fetch_upstream.py" in listing
@@ -93,7 +110,12 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     venv.create(env_dir, with_pip=True)
     bindir = env_dir / ("Scripts" if sys.platform == "win32" else "bin")
     python = bindir / "python"
-    installed = _run(python, "-m", "pip", "install", "-q", wheel)
+    if os.environ.get("AUTHCHALLENGE_E2E_PYPI") == "1":
+        old = _run(python, "-m", "pip", "install", "-q", "authchallenge==0.2.0")
+        assert old.returncode == 0, old.stderr
+        check = "import authchallenge as a; assert a.__version__ == '0.2.0'"
+        assert _run(python, "-I", "-c", check, cwd=tmp_path).returncode == 0
+    installed = _run(python, "-m", "pip", "install", "-q", "--upgrade", wheel)
     assert installed.returncode == 0, installed.stderr
 
     # Run from an empty folder so the source tree cannot shadow the install.
@@ -102,6 +124,12 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     result = _run(python, "-I", "-c", PROGRAM, cwd=work)
     assert result.returncode == 0, result.stderr
     assert result.stdout.decode().strip() == "e2e ok"
+    consumer = work / "consumer.py"
+    consumer.write_text(CONSUMER, encoding="utf-8")
+    typed = _run(
+        sys.executable, "-m", "mypy", "--strict", "--python-executable", python, consumer, cwd=work
+    )
+    assert typed.returncode == 0, typed.stdout
 
     head = b'HTTP/2 401\r\nwww-authenticate: Basic realm="a"\r\nX-Other: Basic\r\n\r\n'
     script = bindir / ("authchallenge.exe" if sys.platform == "win32" else "authchallenge")

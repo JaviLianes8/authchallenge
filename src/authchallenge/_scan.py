@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ._grammar import QUOTED_RE, TOKEN_RE, bad_octet, is_token68, unquote
+from ._grammar import QUOTED_RE, TOKEN_RE, bad_octet, is_token68, shown, unquote
 from ._model import AuthError
 
 _PARAM = re.compile(rf"({TOKEN_RE})[ \t]*=[ \t]*({QUOTED_RE}|{TOKEN_RE})", re.DOTALL)
@@ -37,6 +37,7 @@ class Item:
     open: bool = False
     error: str = ""
     error_at: int = 0
+    quiet: str = ""  # the error without input text, for credentials, which carry secrets
 
 
 def fail(reason: str, offset: int) -> AuthError:
@@ -44,14 +45,18 @@ def fail(reason: str, offset: int) -> AuthError:
     return AuthError(f"{reason} at offset {offset}")
 
 
-def prepare(value: str, strict: bool) -> str:
-    """Unfold obs-fold and, in strict mode, refuse it and any character a field cannot hold."""
+def prepare(value: str, strict: bool, quiet: bool = False) -> str:
+    """Unfold obs-fold and, in strict mode, refuse it and any character a field cannot hold.
+
+    With `quiet`, for credentials, the error gives the offset without the character."""
     if strict:
         fold = _OBS_FOLD.search(value)
         if fold is not None:
             raise fail("obsolete line folding", fold.start())
         bad = bad_octet(value)
         if bad is not None:
+            if quiet:
+                raise fail("a character a field value cannot hold", bad)
             raise fail(f"character {value[bad]!r} is not allowed in a field value", bad)
         return value
     return _OBS_FOLD.sub(" ", value)
@@ -91,7 +96,8 @@ def _read_param(item: Item, text: str, offset: int) -> bool:
     item.param = param
     rest = text[match.end() :]
     if rest:
-        item.error = f"unexpected text after the value of {param.name!r}"
+        item.error = f"unexpected text after the value of {shown(param.name)}"
+        item.quiet = "unexpected text after the value of an auth-param"
         item.error_at = offset + len(text) - len(rest.lstrip(" \t"))
         if not param.quoted and rest[0] not in " \t":
             item.param = None  # a token cut short by a stray character is not the value
@@ -117,7 +123,8 @@ def classify(offset: int, raw: str, strict: bool) -> Item:
     gap = raw.lstrip(" \t")[scheme.end() :]
     rest = after.lstrip(" \t")
     space = gap[: len(gap) - len(gap.lstrip(" \t"))]
-    item.open = space != "" and (" " in space if strict else True)
+    # RFC 9110 section 11.3: 1*SP opens the params; a tab alone ends the challenge.
+    item.open = space.startswith(" ")
     if space == "" and after:
         item.error, item.error_at = "expected a space after the auth-scheme", at + scheme.end()
         return item

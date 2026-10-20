@@ -11,10 +11,11 @@ import authchallenge
 
 ROOT = Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+GUIDE = (ROOT / "GUIDE.md").read_text(encoding="utf-8")
 
 
-def _python_blocks() -> list[str]:
-    return re.findall(r"```python\n(.*?)```", README, flags=re.DOTALL)
+def _python_blocks(text: str = README) -> list[str]:
+    return re.findall(r"```python\n(.*?)```", text, flags=re.DOTALL)
 
 
 def _expected_output(block: str) -> list[str]:
@@ -35,6 +36,23 @@ def test_every_readme_example_runs_and_prints_its_comments() -> None:
         assert out.getvalue().splitlines() == expected
         checked += len(expected)
     assert checked == 17
+
+
+def test_every_guide_example_runs_and_prints_its_comments() -> None:
+    blocks = _python_blocks(GUIDE)
+    assert len(blocks) == 5
+    for block in blocks:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            exec(compile(block, "GUIDE.md", "exec"), {"__name__": "guide"})
+        expected = _expected_output(block)
+        assert expected, block
+        assert out.getvalue().splitlines() == expected
+
+
+def test_the_guide_names_every_public_name() -> None:
+    for name in authchallenge.__all__:
+        assert f"`{name}" in GUIDE, name
 
 
 def test_the_api_table_lists_every_public_name() -> None:
