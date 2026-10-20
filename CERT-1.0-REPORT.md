@@ -213,3 +213,32 @@ Gates at d0d77ef, from a fresh clone on Elena's PC (CPython 3.14.2, the fetched 
 0.2.0 oracle present): `ruff format --check .`, `ruff check .`, `mypy --strict src`,
 `mypy --strict src tests` and `pytest` exit 0 (501 passed, 8 skipped: the opt-in e2e and the
 live oracles whose tools are not installed there).
+
+### Round 2 (at 64215e6)
+
+Lenses a, c and e reported; every finding was accepted and fixed, none is disputed. Each
+behaviour bug first got a contract in `tests/test_qa_round2.py` that failed on 64215e6, then
+the fix. Fixed in d59b7d7 and 25daa85.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| a N1, c N2 | Strict errors on Digest `username*` quoted the ext-value, its language or its charset; a bad octet in credentials quoted the character | `username*` errors say "the Digest username* parameter is not a valid ext-value"; a bad octet in credentials gives only its offset ("a character a field value cannot hold"); challenges keep the character. A seeded sweep of 4,000 hostile credentials checks that no strict error carries a marker planted in the input |
+| c N1, e N5 | `decode_basic(Credentials)` quoted the scheme, which holds the base64 when a value without a scheme was parsed tolerantly | Never quoted: "not Basic credentials: the scheme is not Basic", pinned for `Credentials` with a base64 scheme and with `Digest` |
+| c N3 | A `TypeError` raised while iterating the caller's iterable became a message about the argument type (`select_challenge`, and `each_line` behind `parse_challenges` and `parse_auth_info`) | Only `iter()` is guarded; the caller's own `TypeError` propagates |
+| e N1 | No test that strict credentials errors do not name a duplicate param | The exact message `duplicate auth-param at offset 21` is pinned, and duplicates with a secret-looking name are in the sweep |
+| e N2 | No CLI test of a folded line starting with a tab | Header-dump test with a tab continuation |
+| e N3 | No CLI test that only SP and HTAB are whitespace | A first line of VT, FF or NEL reads as a plain line; a plain line ending in FF fails `--strict` at offset 15 |
+| e N4 | No test of three extlang subtags or a 4-letter language | `zh-abc-def`, `zh-abc-def-ghi` and `abcd` accepted, `zh-abc-def-ghi-jkl` refused |
+
+Mutants run against the new contracts, each applied alone (all killed): the duplicate-param
+name without the credentials guard; obs-fold on space only; `strip()` for the first line;
+`strip()` for plain lines; one extlang at most; a language of 5 to 8 letters; the scheme
+quoted again in `decode_basic`; the `username*` error re-raised as is; the bad-octet message
+with the character for credentials; `list()` of the iterable inside the type guard.
+
+Gates on Elena's PC (CPython 3.14.2, a copy of the commit with the fetched sources). At
+d59b7d7 one test failed, `tests/test_schemes.py`, which pinned the old quoted `username*`
+message; 25daa85 pins the new one. At 25daa85 `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests` and `pytest` exit 0 (539 tests collected, 11
+skipped: the opt-in e2e, the 0.2.0 oracle, and the live oracles whose tools are not installed
+there).
