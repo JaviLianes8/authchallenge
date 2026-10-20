@@ -117,7 +117,7 @@ def classify(offset: int, raw: str, strict: bool) -> Item:
     gap = raw.lstrip(" \t")[scheme.end() :]
     rest = after.lstrip(" \t")
     space = gap[: len(gap) - len(gap.lstrip(" \t"))]
-    item.open = space != "" and (" " in space if strict else True)
+    item.open = space != ""  # strict mode refuses a tab in it below
     if space == "" and after:
         item.error, item.error_at = "expected a space after the auth-scheme", at + scheme.end()
         return item
