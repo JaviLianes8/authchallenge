@@ -17,8 +17,8 @@ Progress:
 - [x] Author mutation round (item 18)
 - [x] Gates (item 15), final run
 - [x] PR and trace guard CLEAN
-- [ ] Five QA lenses report PASS (item 19)
-- [ ] Independent reviewer reports PASS (item 16)
+- [x] Five QA lenses report PASS (item 19)
+- [x] Independent reviewer reports PASS (item 16)
 - [ ] Merge and publish (item 17), by the maintainer
 
 ## Scorecard
@@ -40,10 +40,10 @@ Progress:
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
 | 14 | sdist and wheel contents | PASS |
 | 15 | Gates each exit 0 | PASS: see Gates |
-| 16 | Independent reviewer | pending |
+| 16 | Independent reviewer | PASS: round 1 at 8a50f87, every item PASS (see Independent review) |
 | 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
 | 18 | Contracts bite (mutations) | PASS: 43 author mutants, all killed |
-| 19 | Five independent QA lenses | pending |
+| 19 | Five independent QA lenses | PASS: a, b, c, d and e all PASS (see Final verdicts) |
 
 ## Baseline on 0.2.0 (before any change)
 
@@ -262,3 +262,56 @@ Mutants run against the new contracts, each applied alone on this PC (all killed
 Gates on Elena's PC (CPython 3.14.2, a copy of the tree with the new tests): `ruff format
 --check .`, `ruff check .`, `mypy --strict src` and `pytest` exit 0; `mypy --strict src tests`
 exits 0 on this PC.
+
+### Final verdicts
+
+Each lens re-ran its own earlier findings and a fresh sweep until it reported no finding.
+The reports stay in the local certification folder (`authchallenge-cert/`), not in the
+repository.
+
+| Lens | Rounds | Final verdict | Report | Commit |
+| --- | --- | --- | --- | --- |
+| a, API and docs | 3 | PASS | `lens-a-r3/REPORT.md` | c5de815 |
+| b, correctness and ground truth | 2 | PASS | `lens-b-r2/REPORT.md` | 64215e6 |
+| c, adversarial and robustness | 3 | PASS | `lens-c-r3/REPORT.md` | c5de815 |
+| d, packaging and real e2e | 2 | PASS | `lens-d-r2/` (`remote.log`, `probes.log`, `matrix-m1.log` to `matrix-m6.log`) | 64215e6 |
+| e, contract strength | 4 | PASS | `lens-e-r4/REPORT.md` | 8a50f87 |
+
+Lens d, round 2: the CLI stdin finding is fixed (realms whose octets are `caf` E9, 80 81 and
+`caf` E2 80 A8 `e` give exit 0, empty stderr and the realm of
+`parse_challenges(raw.decode("latin-1"))`, 24 of 24 runs per venv over tolerant and strict
+mode, cp1252, `-X utf8`, the console script and `PYTHONIOENCODING=utf-8`, on the wheel, the
+sdist and the upgraded venv); `python -m build` and `twine check` pass; the upgrade from PyPI
+0.2.0 works with the console script; 487 passed and 6 skipped (the absent httpx, requests and
+werkzeug oracles) on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2
+free-threaded with e2e, the PyPI e2e, the 0.2.0 oracle and the fetched sources; 38 sweep
+probes found nothing.
+
+Lens e, round 4: 10 new mutants on the functions of its earlier findings, all killed.
+
+## Independent review (item 16)
+
+Round 1, at 8a50f87, a fresh clone on Elena's PC (`review-r1/remote/elena.log`) and the
+interpreter matrix (`review-r1/remote/mx.log`). Verdict: PASS, no finding.
+
+| # | Item | Reviewer |
+| --- | --- | --- |
+| 1 | Public API reviewed for stability | PASS |
+| 2 | `__all__` exact, no private imports in docs | PASS |
+| 3 | Docstrings with runnable examples, doctests | PASS |
+| 4 | Typed end to end | PASS: `mypy --strict src` (13 files) and `mypy --strict src tests` (42 files) clean |
+| 5 | Typed, documented, bounded errors | PASS |
+| 6 | Contract tests of every public name | PASS |
+| 7 | Real ground truth | PASS: the eight sources fetched again and matched the manifest |
+| 8 | Real e2e from the wheel | PASS: wheel in a fresh venv, the library and the CLI (`authchallenge` and `python -m authchallenge`) exit 0 |
+| 9 | Seeded fuzz, no crash, hang or blowup | PASS |
+| 10 | Supported Pythons | PASS: 537 passed, 8 skipped on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded |
+| 11 | README and `twine check` | PASS: both files PASSED |
+| 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-20 |
+| 13 | pyproject 1.0.0, Production/Stable | PASS |
+| 14 | sdist and wheel contents | PASS: wheel 26,897 bytes, sdist 61,241 bytes, contents listed |
+| 15 | Gates each exit 0 | PASS: `ruff format --check .`, `ruff check .`, `mypy --strict src`, `pytest` |
+| 16 | Independent reviewer | PASS |
+| 17 | PR and trace guard | PASS: PR #3 from `release/1.0.0`; merge and publish left to the maintainer |
+| 18 | Contracts bite (mutations) | PASS |
+| 19 | Five independent QA lenses | PASS |
